@@ -52,12 +52,10 @@ takeover_globals() {
     local gp ghome
     IFS=$'\t' read -r gp ghome < "$GLOCK" 2>/dev/null || true
     if gm_alive "$gp" && gm_is_cmd "$gp" "bin/monitor" && [[ $gp != $$ ]]; then
-      if [[ $ghome == "$GM_HOME" ]]; then
-        echo "monitor 已在运行（pid ${gp}，home ${ghome:-?}）" >&2
-        exit 1
-      fi
-      echo "接管：终止其它 home 的 monitor（pid ${gp}，home ${ghome:-?}）" >&2
-      kill -TERM "$gp" 2>/dev/null; sleep 1; kill -9 "$gp" 2>/dev/null
+      # 机器级单实例：任何 home 的 monitor 活着就拒绝新实例（绝不互杀——
+      # 会话都在同一个 opencode 数据库里，其它 home 的任务由在跑的 monitor 经 DB 发现覆盖）
+      echo "monitor 已在运行（pid ${gp}，home ${ghome:-?}），本实例退出" >&2
+      exit 1
     fi
   fi
   printf '%s\t%s\n' "$$" "$GM_HOME" | gm_atomic_write "$GLOCK"
@@ -92,15 +90,15 @@ end run
 AS
   printf '%s' "$out"
 }
-as_list() {
-  local out
-  out=$(_as_list_once)
-  # 枚举偶发失败/空输出：立即重试一次（P2）
-  if [[ -z $out ]]; then
+as_list() { # rc: 0=成功（可能为空=Ghostty 零窗口）；非0=真失败
+  local out rc
+  out=$(_as_list_once); rc=$?
+  if [[ -z $out && $rc -ne 0 ]]; then
     sleep 0.5
-    out=$(_as_list_once)
+    out=$(_as_list_once); rc=$?
   fi
   printf '%s' "$out"
+  return $rc
 }
 
 as_new_window() { # cmd env... fontsize（最后一个不含 = 的参数）
@@ -410,11 +408,8 @@ last_rebuild=0
 
 reconcile() {
   find "$GM_STATE" -name 'launch-*.sh' -mmin +1 -delete 2>/dev/null || true
-  LIVE_LIST=$(as_list)
-  if [[ -z $LIVE_LIST ]]; then
-    log "osascript 读取 Ghostty 状态失败（检查自动化权限）"
-    return 1
-  fi
+  LIVE_LIST=$(as_list) || { log "osascript 读取 Ghostty 状态失败（检查自动化权限）"; return 1; }
+  # LIVE_LIST 可能为空（Ghostty 零窗口）→ 视作监控窗口不存在，走 dash_bad 防抖后新建
   read_dash
 
   # 1) 监控窗口校验

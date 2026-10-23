@@ -18,12 +18,22 @@ ensure_started() {
   local p i=0
   p=$(cat "$GM_STATE/monitor.pid" 2>/dev/null || true)
   if gm_alive "$p" && gm_is_cmd "$p" "bin/monitor"; then return 0; fi
+  # 机器级互斥：其它 home 的 monitor 在跑 = 本 home 的会话由它经 DB 发现覆盖，不再拉起
+  local gl gpid
+  gl="$GM_ROOT/state/monitor.global"
+  gpid=$(cat "$gl" 2>/dev/null | cut -f1)
+  if gm_alive "$gpid" && gm_is_cmd "$gpid" "bin/monitor"; then return 0; fi
   nohup "$GM_ROOT/bin/monitor" >> "$GM_LOGS/monitor.out" 2>&1 &
   while (( i < 24 )); do
     p=$(cat "$GM_STATE/monitor.pid" 2>/dev/null || true)
     gm_alive "$p" && return 0
     sleep 0.25; i=$((i + 1))
   done
+  # 本 home 的 monitor 被全局互斥拒绝 → 若机器上有任何 monitor 在跑，视为已覆盖
+  local gl gpid
+  gl="$GM_ROOT/state/monitor.global"
+  gpid=$(cat "$gl" 2>/dev/null | cut -f1)
+  gm_alive "$gpid" && { echo "（机器上已有 monitor pid ${gpid} 覆盖本 home 的会话）" >&2; return 0; }
   return 1
 }
 
