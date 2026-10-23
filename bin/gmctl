@@ -98,8 +98,18 @@ on run argv
   end tell
 end run
 AS
-  # 兜底：按脚本路径清理任何残留的监控族进程（相对/绝对路径启动都覆盖）
-  pkill -TERM -f 'ghostty-monitor/bin/(monitor|usage-pane|pane-watcher|slot-pane)' 2>/dev/null || true
+  # 兜底：清理本 GM_HOME 的监控族进程（按环境变量 GM_HOME 匹配，不影响其它 home 的监控）
+  local fam="ghostty-monitor/bin/(monitor|usage-pane|pane-watcher|slot-pane)"
+  local pid
+  for pid in $(pgrep -f "$fam" 2>/dev/null); do
+    [[ $pid == $$ ]] && continue
+    local pe
+    pe=$(ps eww -o command= -p "$pid" 2>/dev/null)
+    case $pe in
+      *"GM_HOME=$GM_HOME "*|*"GM_HOME=$GM_HOME") kill -TERM "$pid" 2>/dev/null || true ;;
+      *) : ;;
+    esac
+  done
   if (( keep == 0 )); then
     rm -f "$DASH" "$GM_STATE/layout.sig"
   fi
