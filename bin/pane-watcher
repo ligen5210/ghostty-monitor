@@ -32,7 +32,31 @@ TOK=""; TOK_AT=0; MSGS=""
 cleanup_tmp() { rm -f "$BUF" "$HEADF" "$BODYF"; }
 trap cleanup_tmp EXIT
 
-pty_alive() { stty size </dev/tty >/dev/null 2>&1; }
+pty_alive() { stty size </dev/tty >/dev/tty >/dev/null 2>&1; }
+
+# 按显示宽度折行（CJK=2 格）；fold 只按字符数，会低估中文导致换行溢出
+wrap_lines() { # width
+  python3 -c '
+import sys, unicodedata
+w = int(sys.argv[1])
+def dw(s):
+    t = 0
+    for c in s:
+        o = ord(c)
+        if (11904 <= o <= 12350) or (12353 <= o <= 13311) or (13312 <= o <= 19903) or (19968 <= o <= 40959) or (63744 <= o <= 64255) or (65280 <= o <= 65376) or (65504 <= o <= 65510) or (4352 <= o <= 4447) or o >= 131072:
+            t += 2
+    return t
+for line in sys.stdin:
+    line = line.rstrip("\n")
+    cur = ""
+    for ch in line:
+        if dw(cur + ch) > w and cur:
+            print(cur); cur = ch
+        else:
+            cur += ch
+    print(cur)
+' "$1"
+}
 
 
 emit_text() { # label color text（多行文本，首行带标签）
@@ -46,14 +70,14 @@ emit_text() { # label color text（多行文本，首行带标签）
     else
       printf '  %s\n' "$ln"
     fi
-  done < <(printf '%s\n' "$text" | fold -s -w "$w")
+  done < <(printf '%s\n' "$text" | wrap_lines "$w")
   printf '\n'
 }
 
 emit_dim() {
   local w=$((GM_TERM_COLS - 4)) ln
   (( w < 24 )) && w=24
-  printf '%s\n' "$1" | fold -s -w "$w" | while IFS= read -r ln; do
+  printf '%s\n' "$1" | wrap_lines "$w" | while IFS= read -r ln; do
     printf '\033[2m  %s\033[0m\n' "$ln"
   done
 }
@@ -62,11 +86,11 @@ emit_tool() { # name status arg output
   local name=$1 status=$2 arg=$3 out=$4 w=$((GM_TERM_COLS - 8)) ln first=1
   (( w < 20 )) && w=20
   printf '\033[1;33m⚙ %s\033[0m \033[2m[%s]\033[0m ' "${name:-tool}" "${status:-?}"
-  printf '%s\n' "${arg:-}" | fold -s -w "$w" | while IFS= read -r ln; do
+  printf '%s\n' "${arg:-}" | wrap_lines "$w" | while IFS= read -r ln; do
     if (( first )); then printf '%s\n' "$ln"; first=0; else printf '  %s\n' "$ln"; fi
   done
   if [[ -n ${out:-} ]]; then
-    printf '%s\n' "$out" | fold -s -w "$((GM_TERM_COLS - 6))" | while IFS= read -r ln; do
+    printf '%s\n' "$out" | wrap_lines "$((GM_TERM_COLS - 6))" | while IFS= read -r ln; do
       printf '\033[2m  ⎿ %s\033[0m\n' "$ln"
     done
   fi
@@ -147,7 +171,7 @@ render() { # status model card elapsed active sid code
         "$color" "$state_text" "$(gm_fmt_dur "$elapsed")" "${code:--}" >> "$HEADF"
     fi
   fi
-  printf '\033[2m%s\033[0m\n' "$(printf '─%.0s' $(seq 1 "$GM_TERM_COLS"))" >> "$HEADF"
+  printf '\033[2m%s\033[0m\n' "$(printf '─%.0s' $(seq 1 $((GM_TERM_COLS - 2))))" >> "$HEADF"
 
   : > "$BODYF"
   flush_r() {
@@ -180,7 +204,7 @@ render() { # status model card elapsed active sid code
       [[ -f $LOG ]] && tail -n "$((BODY_LINES - 2))" "$LOG"
     } >> "$BUF"
   fi
-  printf '\033[2m%s\033[0m\n' "$(printf '─%.0s' $(seq 1 "$GM_TERM_COLS"))" >> "$BUF"
+  printf '\033[2m%s\033[0m\n' "$(printf '─%.0s' $(seq 1 $((GM_TERM_COLS - 2))))" >> "$BUF"
   if (( active )); then
     printf '\033[2m跟随中 · %s · %s\033[0m' "$(date '+%H:%M:%S')" "$([[ -n $sid ]] && echo "ses ${sid: -8}" || echo '无会话')" >> "$BUF"
   else
@@ -213,7 +237,7 @@ while :; do
   LOG=${logf:-}
   started=${started:-0}; pid=${pid:-0}; code=${code:-0}
   gm_term_size
-  BODY_LINES=$((GM_TERM_LINES - 5))
+  BODY_LINES=$((GM_TERM_LINES - 6))
   (( BODY_LINES < 4 )) && BODY_LINES=4
 
   active=0
