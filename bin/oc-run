@@ -1,0 +1,170 @@
+#!/bin/bash
+# oc-run — 给一条 opencode 命令套上注册表登记/回写，供 monitor 观察。
+#
+# 用法：
+#   oc-run --id <id> --model <model> [--card 说明] [--log 路径] [--cwd 目录]
+#          [--timeout 秒] [--no-start] -- <命令...>
+#
+# 行为：
+#   1. 默认自动拉起监控面板（--no-start / GM_AUTOSTART=0 关闭）
+#   2. 启动前写 runs/<id>.json（status=running）
+#   3. 执行命令，stdout/stderr 同时进日志文件和当前终端
+#   4. 退出后回写 status=done|failed、exit、duration、finished
+#   5. oc-run 被杀（TERM/INT）时先终止子进程再回写 failed
+#
+# 手动和跑批器都走它；monitor 只读注册表，不关心命令是什么。
+
+set -uo pipefail
+source "$(cd "$(dirname "$0")" && pwd)/gm-lib.sh"
+
+usage() {
+  sed -n '2,21p' "$0"
+  exit "${1:-0}"
+}
+
+ID=""; MODEL=""; CARD=""; LOG=""; CWD="$(pwd)"; TIMEOUT=0; AUTOSTART=1
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --id) ID=${2:-}; shift 2 ;;
+    --model) MODEL=${2:-}; shift 2 ;;
+    --card) CARD=${2:-}; shift 2 ;;
+    --log) LOG=${2:-}; shift 2 ;;
+    --cwd) CWD=${2:-}; shift 2 ;;
+    --timeout) TIMEOUT=${2:-0}; shift 2 ;;
+    --no-start) AUTOSTART=0; shift ;;
+    -h|--help) usage 0 ;;
+    --) shift; break ;;
+    *) echo "oc-run: 未知参数 $1" >&2; usage 1 ;;
+  esac
+done
+[[ ${GM_AUTOSTART:-1} == 0 ]] && AUTOSTART=0
+
+[[ -n $ID ]] || { echo "oc-run: 缺少 --id" >&2; exit 2; }
+[[ -n $MODEL ]] || { echo "oc-run: 缺少 --model" >&2; exit 2; }
+[[ $# -gt 0 ]] || { echo "oc-run: -- 之后缺少命令" >&2; exit 2; }
+[[ $ID =~ ^[A-Za-z0-9._-]+$ ]] || { echo "oc-run: id 只允许字母数字._-（当前: ${ID}）" >&2; exit 2; }
+[[ -d $CWD ]] || { echo "oc-run: 工作目录不存在: $CWD" >&2; exit 2; }
+[[ $TIMEOUT =~ ^[0-9]+$ ]] || { echo "oc-run: --timeout 必须是整数秒" >&2; exit 2; }
+
+CWD=$(cd "$CWD" && pwd -P)
+LOG=${LOG:-$GM_LOGS/$ID.log}
+mkdir -p "$(dirname "$LOG")"
+LOG=$(cd "$(dirname "$LOG")" && pwd)/$(basename "$LOG")
+: >> "$LOG"
+
+REG="$GM_RUNS/$ID.json"
+[[ -f $REG ]] && gm_run_active "$REG" && {
+  echo "oc-run: 已存在活跃 run ${ID}（${REG}），拒绝重复登记" >&2
+  exit 3
+}
+
+# 默认自动拉起监控面板（--no-start / GM_AUTOSTART=0 可关闭）
+if (( AUTOSTART )); then
+  "$GM_ROOT/bin/gm" ensure >/dev/null 2>&1 || true
+fi
+
+CARD=${CARD:-$ID}
+START=$(gm_now)
+START_ISO=$(date '+%Y-%m-%d %H:%M:%S')
+CMD_JSON=$(printf '%s\0' "$@" | jq -Rs 'split("\u0000")[:-1]')
+TO_FLAG="$GM_STATE/timeout-$ID"
+rm -f "$TO_FLAG"
+
+write_reg() { # status exit note
+  local status=$1 code=$2 note=${3:-} now end dur
+  now=$(gm_now); end=$(date '+%Y-%m-%d %H:%M:%S'); dur=$((now - START))
+  jq -n \
+    --arg id "$ID" --arg model "$MODEL" --arg card "$CARD" \
+    --arg log "$LOG" --argjson pid "$PID" --argjson started "$START" \
+    --arg started_iso "$START_ISO" --arg status "$status" \
+    --argjson exit "$code" --argjson duration "$dur" \
+    --arg finished "$end" --arg cwd "$CWD" --arg note "$note" \
+    --arg pid_start "${PID_START:-}" --argjson timeout "$TIMEOUT" \
+    --argjson cmd "$CMD_JSON" \
+    '{id:$id, model:$model, card:$card, log:$log, pid:$pid, pid_start:$pid_start,
+      started:$started, started_iso:$started_iso, finished:$finished,
+      status:$status, exit:$exit, duration:$duration, timeout:$timeout,
+      cwd:$cwd, cmd:$cmd, note:$note}' | gm_atomic_write "$REG"
+}
+
+# 尽力把 run 对应的 opencode session 绑定到 state/session-<id>
+bind_session() {
+  local sf="$GM_STATE/session-$ID" sid
+  sid=$(gm_find_session "$CWD" "$START") || return 1
+  [[ -n $sid ]] || return 1
+  printf '%s' "$sid" > "$sf.tmp.$$" 2>/dev/null && mv -f "$sf.tmp.$$" "$sf" 2>/dev/null
+}
+
+FINALIZED=0
+finalize() { # exit_code [note]
+  local rc=${1:-1} note=${2:-}
+  (( FINALIZED )) && return
+  FINALIZED=1
+  [[ -f $TO_FLAG ]] && note=${note:+$note }"timeout"
+  # 收尾时再解析一次会话（短任务也能绑定）
+  bind_session >/dev/null 2>&1 || true
+  [[ -n $BINDER ]] && kill "$BINDER" 2>/dev/null
+  if (( rc == 0 )); then
+    write_reg done 0 "$note"
+  else
+    write_reg failed "$rc" "$note"
+  fi
+  rm -f "$TO_FLAG"
+}
+
+CHILD=""
+WATCHDOG=""
+BINDER=""
+cleanup_signal() {
+  trap - TERM INT
+  [[ -n $WATCHDOG ]] && kill "$WATCHDOG" 2>/dev/null
+  [[ -n $BINDER ]] && kill "$BINDER" 2>/dev/null
+  [[ -n $CHILD ]] && kill -TERM "$CHILD" 2>/dev/null
+  sleep 0.2
+  [[ -n $CHILD ]] && kill -9 "$CHILD" 2>/dev/null
+  finalize 143 "signal"
+  exit 143
+}
+trap cleanup_signal TERM INT
+
+# 启动：切到目标工作目录（opencode 会话按 cwd 归属），输出同时进日志与当前终端
+cd "$CWD" || { echo "oc-run: 无法进入工作目录: $CWD" >&2; exit 2; }
+"$@" > >(tee -a "$LOG") 2>&1 &
+CHILD=$!
+PID=$CHILD
+PID_START=$(gm_pid_lstart "$CHILD")
+
+write_reg running 0 ""
+
+# 后台绑定 opencode 会话 id（最多等 30 秒；run 结束前一直可解析）
+(
+  i=0
+  while (( i < 60 )); do
+    bind_session && break
+    sleep 0.5
+    i=$((i + 1))
+  done
+) >/dev/null 2>&1 &
+BINDER=$!
+
+if (( TIMEOUT > 0 )); then
+  (
+    sleep "$TIMEOUT"
+    if kill -0 "$CHILD" 2>/dev/null; then
+      date '+%Y-%m-%d %H:%M:%S' >> "$TO_FLAG"
+      echo "[oc-run] 超时 ${TIMEOUT}s，终止 ${ID} (pid ${CHILD})" >> "$LOG"
+      kill -TERM "$CHILD" 2>/dev/null
+      sleep 3
+      kill -9 "$CHILD" 2>/dev/null
+    fi
+  ) >/dev/null 2>&1 &
+  WATCHDOG=$!
+fi
+
+wait "$CHILD"
+RC=$?
+[[ -n $WATCHDOG ]] && kill "$WATCHDOG" 2>/dev/null
+CHILD=""
+
+finalize "$RC"
+exit "$RC"

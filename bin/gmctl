@@ -1,0 +1,209 @@
+#!/bin/bash
+# gmctl — ghostty-monitor 控制台。
+#
+#   gmctl start          后台启动 monitor
+#   gmctl start -f       前台运行（Ctrl-C 退出）
+#   gmctl stop           停止 monitor 并关闭监控窗口（--keep-ui 保留窗口）
+#   gmctl status         查看 monitor / 网格 / runs
+#   gmctl open <id>      用 opencode TUI 在新窗口打开该 run 的会话（活跃 run 需 --force）
+#   gmctl doctor         环境与能力自检
+#   gmctl attach         前台运行 monitor（同 start -f）
+
+set -uo pipefail
+source "$(cd "$(dirname "$0")" && pwd)/gm-lib.sh"
+
+PIDFILE="$GM_STATE/monitor.pid"
+DASH="$GM_STATE/dashboard.tsv"
+PANES="$GM_STATE/panes.tsv"
+GRID_FILE="$GM_STATE/grid.tsv"
+
+as_close_window() {
+  osascript - "$1" 2>/dev/null <<'AS' >/dev/null
+on run argv
+  tell application "Ghostty"
+    close window (window id (item 1 of argv))
+  end tell
+end run
+AS
+}
+
+monitor_pid() {
+  local p
+  p=$(cat "$PIDFILE" 2>/dev/null || true)
+  if gm_alive "$p" && gm_is_cmd "$p" "bin/monitor"; then echo "$p"; return; fi
+  # pidfile 丢失时退回 pgrep，避免重复启动
+  p=$(pgrep -f "$GM_ROOT/bin/monitor" 2>/dev/null | head -n 1)
+  gm_alive "$p" && echo "$p"
+}
+
+cmd_start() {
+  local fg=0
+  [[ ${1:-} == -f || ${1:-} == --foreground ]] && fg=1
+  local p
+  p=$(monitor_pid)
+  if [[ -n $p ]]; then echo "monitor 已在运行（pid ${p}）"; return 0; fi
+  if (( fg )); then
+    exec "$GM_ROOT/bin/monitor"
+  fi
+  nohup "$GM_ROOT/bin/monitor" >> "$GM_LOGS/monitor.out" 2>&1 &
+  sleep 1
+  p=$(monitor_pid)
+  if [[ -n $p ]]; then
+    echo "monitor 已启动（pid ${p}）"
+    echo "日志: $GM_LOGS/monitor.log"
+    echo "状态: gmctl status"
+  else
+    echo "monitor 启动失败，见 $GM_LOGS/monitor.out / $GM_LOGS/applescript.err" >&2
+    tail -n 20 "$GM_LOGS/monitor.out" >&2 2>/dev/null
+    return 1
+  fi
+}
+
+cmd_stop() {
+  local keep=0
+  [[ ${1:-} == --keep-ui ]] && keep=1
+  local p
+  p=$(monitor_pid)
+  if [[ -n $p ]] && gm_is_cmd "$p" "bin/monitor"; then
+    kill -TERM "$p" 2>/dev/null
+    local i=0
+    while gm_alive "$p" && (( i < 20 )); do sleep 0.25; i=$((i + 1)); done
+    gm_alive "$p" && kill -9 "$p" 2>/dev/null
+    echo "monitor 已停止（pid ${p}）"
+  else
+    echo "monitor 未运行"
+  fi
+  if (( keep == 0 )) && [[ -f $DASH ]]; then
+    local dwid
+    IFS=$'\t' read -r dwid _ _ < "$DASH" 2>/dev/null || true
+    if [[ -n ${dwid:-} ]]; then
+      as_close_window "$dwid"
+      echo "监控窗口已关闭"
+    fi
+    rm -f "$DASH"
+  fi
+  rm -f "$PIDFILE"
+}
+
+cmd_status() {
+  local p
+  p=$(monitor_pid)
+  printf 'monitor : %s\n' "${p:-未运行}"
+  if [[ -f $DASH ]]; then
+    local dwid dterm created
+    IFS=$'\t' read -r dwid dterm created < "$DASH" || true
+    printf '窗口    : %s（用量 pane %s）\n' "${dwid:-?}" "${dterm:-?}"
+  else
+    printf '窗口    : 未创建\n'
+  fi
+  local pc=0
+  [[ -f $GRID_FILE ]] && pc=$(grep -c . "$GRID_FILE" 2>/dev/null || true)
+  printf '对话格  : %s（上限 %s）\n' "${pc:-0}" "${GM_MAX_RUNS}"
+  if [[ -f $GRID_FILE ]]; then
+    while IFS=$'\t' read -r cell kind id tid created; do
+      [[ -z $cell ]] && continue
+      printf '  - 格 %-2s %-4s %-20s %s\n' "$cell" "$kind" "$id" "$tid"
+    done < "$GRID_FILE"
+  fi
+  [[ -f $GM_STATE/layout.sig ]] && printf '布局签名: %s\n' "$(cat "$GM_STATE/layout.sig" 2>/dev/null)"
+  printf 'runs:\n'
+  local f n=0
+  for f in "$GM_RUNS"/*.json; do
+    [[ -f $f ]] || continue
+    n=$((n + 1))
+    printf '  %-18s %-26s %-8s %ss\n' \
+      "$(gm_run_get "$f" .id '-')" "$(gm_run_get "$f" .model '-')" \
+      "$(gm_run_get "$f" .status '-')" "$(gm_run_get "$f" .duration 0)"
+  done
+  (( n == 0 )) && printf '  (无)\n'
+  return 0
+}
+
+cmd_doctor() {
+  local ok=0
+  echo "== 环境 =="
+  if pgrep -f "Ghostty.app/Contents/MacOS/ghostty" >/dev/null 2>&1; then
+    echo "[ok] Ghostty 运行中"
+  else
+    echo "[!!] Ghostty 未运行"; ok=1
+  fi
+  local gv
+  gv=$("/Applications/Ghostty.app/Contents/MacOS/ghostty" --version 2>/dev/null | head -1)
+  echo "     Ghostty 版本: ${gv:-未知}"
+  for c in jq sqlite3 osascript perl; do
+    command -v "$c" >/dev/null 2>&1 && echo "[ok] $c" || { echo "[!!] 缺少 $c"; ok=1; }
+  done
+  [[ -x $GM_GOSTATUS ]] && echo "[ok] go-status.sh 可执行" || echo "[!!] go-status.sh 不可执行: $GM_GOSTATUS"
+  [[ -r $GM_LEDGER ]] && echo "[ok] 台账可读" || echo "[..] 台账不可读: $GM_LEDGER"
+  [[ -r $GM_OPENCODE_DB ]] && echo "[ok] opencode 数据库可读" || echo "[..] opencode 数据库不可读（token 显示为不可得）"
+
+  echo "== AppleScript 探针 =="
+  local out
+  out=$(osascript - 2>/dev/null <<'AS'
+on run argv
+  tell application "Ghostty"
+    return "windows=" & (count windows) & " terminals=" & (count terminals)
+  end tell
+end run
+AS
+)
+  if [[ -n $out ]]; then echo "[ok] $out"; else echo "[!!] 无法通过 AppleScript 访问 Ghostty（系统设置→隐私与安全性→自动化，允许调用方控制 Ghostty）"; ok=1; fi
+
+  echo "== 数据目录 =="
+  echo "     GM_HOME=$GM_HOME"
+  echo "     runs=$(ls -1 "$GM_RUNS"/*.json 2>/dev/null | wc -l | tr -d ' ') state=$GM_STATE"
+  echo "== 能力探针结论（2026-10-23 实测） =="
+  cat <<'EOF'
+     [失败] ghostty +new_split / +new-tab 不存在（1.3.1 CLI 仅有 +new-window）
+     [失败] System Events keystroke（osascript 无辅助访问权限）
+     [可行] AppleScript 字典：new window/split + surface configuration（本工具采用）
+     [可行] perform action "equalize_splits"：任意分割树 → 等面积格子（布局用）
+     [可行] stty size 取 pane 真实尺寸（tput cols 会误报 80x24）
+     [失败] open -na Ghostty.app --args -e（另起独立实例，不适合多 pane）
+     [注意] 命令退出后 pane 不会自动关闭 → monitor 显式 close（已实现）
+EOF
+  return "$ok"
+}
+
+cmd_open() { # run-id [--force]
+  local id=${1:-} force=0 reg sid cwd oc
+  [[ -n $id ]] || { echo "用法: gmctl open <run-id> [--force]" >&2; return 2; }
+  [[ ${2:-} == --force ]] && force=1
+  reg="$GM_RUNS/$id.json"
+  [[ -f $reg ]] || { echo "run 不存在: $id" >&2; return 1; }
+  sid=$(gm_session_for_registry "$reg" 2>/dev/null) || { echo "该 run 还没有绑定 opencode 会话" >&2; return 1; }
+  cwd=$(gm_run_get "$reg" .cwd "$HOME")
+  oc=$(command -v opencode 2>/dev/null || echo "$HOME/.opencode/bin/opencode")
+  [[ -x $oc ]] || { echo "找不到 opencode: $oc" >&2; return 1; }
+  if gm_run_active "$reg" && (( ! force )); then
+    echo "run 仍在运行；附身 TUI 可能影响执行。确认打开请加 --force" >&2
+    return 1
+  fi
+  osascript - "$cwd" "$sid" "$oc" <<'AS' >/dev/null || { echo "打开失败（检查自动化权限）" >&2; return 1; }
+on run argv
+  set wd to item 1 of argv
+  set sid to item 2 of argv
+  set oc to item 3 of argv
+  tell application "Ghostty"
+    set cfg to new surface configuration
+    set command of cfg to oc & " --session " & sid
+    set initial working directory of cfg to wd
+    set wait after command of cfg to false
+    set w to new window with configuration cfg
+    activate window w
+  end tell
+end run
+AS
+  echo "已用 opencode 打开会话 ${sid}（新窗口）"
+}
+
+case ${1:-} in
+  start) shift; cmd_start "$@" ;;
+  stop) shift; cmd_stop "$@" ;;
+  status) cmd_status ;;
+  open) shift; cmd_open "$@" ;;
+  doctor) cmd_doctor ;;
+  attach) exec "$GM_ROOT/bin/monitor" ;;
+  -h|--help|"") sed -n '2,12p' "$0" ;;
+  *) echo "未知命令: $1" >&2; sed -n '2,12p' "$0" >&2; exit 2 ;;
+esac

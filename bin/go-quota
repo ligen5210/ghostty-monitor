@@ -1,0 +1,105 @@
+#!/bin/bash
+# go-quota — 读取 OpenCode Go 套餐用量（缓存 60s）。
+#
+# 数据源（官方接口，API Key 只读调用、不落盘不回显，同 go-status.sh 的方式）：
+#   1) GET https://opencode.ai/zen/go/v1/usage
+#      → {"usage":{"rolling":{"percent","resetsAt"},"weekly":{...},"monthly":{...}}}
+#      rolling = 5 小时窗口（开源插件 oc-usage-limits-plugin 同款接口）
+#   2) GET /console/api/v2/usage/export?range=7d
+#      → 按天×模型的 requests / 各类 token / cost 明细 CSV
+#
+# 输出缓存：
+#   go-quota.txt（TSV）：账号 \t 状态 \t 5h% \t 5h重置 \t 周% \t 周重置 \t 月% \t 月重置
+#   go-usage.txt：首行 = 今日tokens/今日花费/7天tokens/7天花费（micro-cents），
+#                其后 = 模型 \t 7天tokens（降序，前 8）
+
+set -uo pipefail
+source "$(cd "$(dirname "$0")" && pwd)/gm-lib.sh"
+
+CACHE="$GM_CACHE/go-quota.txt"
+USAGE="$GM_CACHE/go-usage.txt"
+LOCK="$GM_CACHE/go-quota.lock"
+SEC_DIR=${GM_SEC_DIR:-/Volumes/移动硬盘/dev/secrets/opencode-go}
+ZEN="https://opencode.ai/zen/go/v1/usage"
+API="https://opencode.ai/console/api"
+
+[[ ${1:-} == --now ]] || exit 0   # 只作为后台刷新入口
+
+[[ -f $LOCK ]] && exit 0
+: > "$LOCK"
+trap 'rm -f "$LOCK"; rm -f "$GM_CACHE/go-usage.csv.tmp.$$"' EXIT
+
+zen_usage() { # key -> stdout JSON
+  curl -s --max-time 20 -H "Accept: application/json" -H "Authorization: Bearer $1" "$ZEN" 2>/dev/null
+}
+
+fetch_csv() { # key range -> stdout CSV
+  curl -s --max-time 30 -H "Authorization: Bearer $1" "$API/v2/usage/export?range=$2" 2>/dev/null
+}
+
+# 官方 token 用量：今日/7天 tokens 与花费 + 模型用量排名（7天 token 降序，前 8）
+write_usage() { # key
+  local csv="$GM_CACHE/go-usage.csv.tmp.$$"
+  fetch_csv "$1" "7d" > "$csv" 2>/dev/null
+  {
+    awk -F, -v t="$(date -u +%F)" -v w="$(date -u -v-Mon +%F 2>/dev/null || date -u -d 'last monday' +%F)" '
+      NR > 1 && $1 != "" {
+        tk = $8 + $9 + $10 + $11 + $12; c = $13 + 0
+        if ($1 == t) { tt += tk; tc += c }
+        if ($1 >= w) { wt += tk; wc += c }
+      } END { printf "%d\t%d\t%d\t%d\n", tt + 0, tc + 0, wt + 0, wc + 0 }' "$csv"
+    awk -F, -v w="$(date -u -v-Mon +%F 2>/dev/null || date -u -d 'last monday' +%F)" '
+      NR > 1 && $1 != "" && $1 >= w && $6 != "" {
+        m[$6] += $8 + $9 + $10 + $11 + $12
+      } END { for (k in m) printf "%s\t%d\n", k, m[k] }' "$csv" \
+      | sort -t"$(printf '\t')" -k2,2rn | head -8 \
+      | while IFS="$(printf '\t')" read -r m tk; do printf '%s\t%d\n' "$m" "${tk:-0}"; done
+  } > "$USAGE.tmp.$$" 2>/dev/null
+  mv -f "$USAGE.tmp.$$" "$USAGE"
+  rm -f "$csv"
+}
+
+first_key() {
+  local s kf k
+  for s in a b; do
+    kf="$SEC_DIR/go-$s.key"
+    [[ -s $kf ]] || continue
+    k=$(tr -d ' \t\n\r' < "$kf")
+    case $k in oc_*) printf '%s' "$k"; return 0 ;; esac
+  done
+  return 1
+}
+
+: > "$CACHE.tmp.$$"
+for s in a b; do
+  kf="$SEC_DIR/go-$s.key"
+  if [[ ! -s $kf ]]; then printf '%s\tkey未填\t-\t-\t-\t-\t-\t-\n' "$s" >> "$CACHE.tmp.$$"; continue; fi
+  k=$(tr -d ' \t\n\r' < "$kf")
+  case $k in oc_*) ;; *) printf '%s\tkey未填\t-\t-\t-\t-\t-\t-\n' "$s" >> "$CACHE.tmp.$$"; continue ;; esac
+
+  json=$(zen_usage "$k")
+  if [[ -z $json ]]; then
+    printf '%s\terr\t-\t-\t-\t-\t-\t-\n' "$s" >> "$CACHE.tmp.$$"
+    continue
+  fi
+  read -r st p5 r5 pw rw pm rm <<<"$(printf '%s' "$json" | jq -r '
+    .usage as $u |
+    if ($u | type) == "object" then
+      ["ok",
+       ($u.rolling.percent // -1 | tostring), ($u.rolling.resetsAt // "-"),
+       ($u.weekly.percent  // -1 | tostring), ($u.weekly.resetsAt  // "-"),
+       ($u.monthly.percent // -1 | tostring), ($u.monthly.resetsAt // "-")] | @tsv
+    else
+      ["err","-","-","-","-","-","-"] | @tsv
+    end' 2>/dev/null)"
+  [[ -z ${st:-} ]] && st=err
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$s" "$st" "${p5:--}" "${r5:--}" "${pw:--}" "${rw:--}" "${pm:--}" "${rm:--}" >> "$CACHE.tmp.$$"
+done
+mv -f "$CACHE.tmp.$$" "$CACHE"
+
+# 官方 token 用量汇总 + 模型排名（workspace 级，含服务账号）
+if k=$(first_key); then
+  write_usage "$k"
+else
+  printf '0\t0\t0\t0\n' > "$USAGE"
+fi

@@ -1,0 +1,366 @@
+#!/bin/bash
+# usage-pane — 图形化用量看板（永不退出）。
+#
+# 布局自适应（多列竖排，内容绝不超屏）：
+#   W≥150 三列：RUNS │ USAGE+模型排行 │ GO QUOTA+LEDGER
+#   W≥104 两列：RUNS+LEDGER │ USAGE+GO QUOTA
+#   其余   单列：RUNS → USAGE → GO QUOTA → LEDGER（超行自动截断）
+# 模型排名竖排（一行一个模型 + 进度条）。每 2 秒重绘，纯文本快照写 state/usage.txt。
+
+set -o pipefail
+GM_HOME_ARG=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -H) GM_HOME_ARG=${2:-}; shift 2 ;;
+    *) shift ;;
+  esac
+done
+[[ -n $GM_HOME_ARG ]] && export GM_HOME=$GM_HOME_ARG
+source "$(cd "$(dirname "$0")" && pwd)/gm-lib.sh"
+
+SNAPSHOT="$GM_STATE/usage.txt"
+GOQUOTA_CACHE="$GM_CACHE/go-quota.txt"
+GOQUOTA_LOCK="$GM_CACHE/go-quota.lock"
+GOUSAGE_FILE="$GM_CACHE/go-usage.txt"
+HIST="$GM_STATE/token-history.txt"
+TOK_DIR="$GM_STATE/tok"
+mkdir -p "$TOK_DIR"
+rm -f "$SNAPSHOT".tmp.* "$SNAPSHOT".new.* 2>/dev/null || true
+
+PLAN_NAME=${GM_PLAN:-go}
+
+refresh_go_quota() {
+  local now age
+  now=$(gm_now); age=$((now - $(gm_mtime "$GOQUOTA_CACHE")))
+  (( age < GM_GOSTATUS_TTL )) && return
+  if [[ -f $GOQUOTA_LOCK ]]; then
+    if (( now - $(gm_mtime "$GOQUOTA_LOCK") > 120 )); then rm -f "$GOQUOTA_LOCK"; else return; fi
+  fi
+  ( "$GM_ROOT/bin/go-quota" --now ) >/dev/null 2>&1 &
+}
+
+# ---------- 小工具 ----------
+usd() {
+  local v=${1:-0}
+  [[ $v =~ ^[0-9]+$ ]] || { printf '%s' "${v:-—}"; return; }
+  awk -v v="$v" 'BEGIN{printf "$%.2f", v/100000000}'
+}
+
+pbar() { # pct width -> 无色进度条
+  local pct=${1:-0} w=${2:-8} fill i out=""
+  (( pct < 0 )) && pct=0
+  (( pct > 100 )) && pct=100
+  fill=$((pct * w / 100))
+  for ((i = 0; i < w; i++)); do
+    if (( i < fill )); then out="${out}█"; else out="${out}░"; fi
+  done
+  printf '%s' "$out"
+}
+
+shimmer() { # elapsed width -> 无色活动条
+  local e=${1:-0} w=${2:-10} i pos
+  pos=$((e % (w + 6)))
+  for ((i = 0; i < w; i++)); do
+    if (( i >= pos - 3 && i < pos )); then printf '▓'; else printf '░'; fi
+  done
+}
+
+_charwide() { # 真 CJK 全宽字符记 2；│─█░✓✗…·↺ 等符号在 Ghostty 里是窄字符（1 格）
+  local ch=$1 code
+  printf -v code '%d' "'$ch"
+  # CJK 区间（十进制）：Hangul Jamo / CJK符号 / 假名 / 扩展A / 表意 / 兼容表意 / 全角形式 / 全角符号 / 扩展B+
+  if (( code >= 4352 && code <= 4447 )) || (( code >= 11904 && code <= 12350 )) || \
+     (( code >= 12353 && code <= 13311 )) || (( code >= 13312 && code <= 19903 )) || \
+     (( code >= 19968 && code <= 40959 )) || (( code >= 63744 && code <= 64255 )) || \
+     (( code >= 65280 && code <= 65376 )) || (( code >= 65504 && code <= 65510 )) || \
+     (( code >= 131072 )); then
+    return 0
+  fi
+  return 1
+}
+dwidth() { # 显示宽度（CJK 记 2）
+  local s=$1
+  local n=${#s} i w=0 ch
+  for ((i = 0; i < n; i++)); do
+    ch=${s:i:1}
+    if _charwide "$ch"; then w=$((w + 2)); else w=$((w + 1)); fi
+  done
+  echo $w
+}
+
+truncw() { # string maxwidth -> 按显示宽截断（超出补 …）
+  local s=$1 max=${2:-20}
+  local n=${#s} i w=0 ch
+  # 提前返回也必须用显示宽度判断（字符数会低估 CJK）
+  if ! [[ $n -gt 0 ]] || (( $(dwidth "$s") <= max )); then
+    printf '%s' "$s"; return
+  fi
+  for ((i = 0; i < n; i++)); do
+    ch=${s:i:1}
+    if _charwide "$ch"; then w=$((w + 2)); else w=$((w + 1)); fi
+    (( w > max )) && { printf '%s…' "${s:0:i}"; return; }
+  done
+  printf '%s' "$s"
+}
+
+padw() { # string width -> 补空格到显示宽度
+  local s=$1 w=$2 dw pad
+  dw=$(dwidth "$s")
+  pad=$((w - dw))
+  (( pad < 0 )) && pad=0
+  printf '%s%*s' "$s" "$pad" ''
+}
+
+run_tokens_cached() { # reg_file -> token 数；无会话返回 1
+  local f=$1 id cache now val sid
+  id=$(gm_run_get "$f" .id "")
+  cache="$TOK_DIR/$id"
+  now=$(gm_now)
+  if [[ -f $cache ]]; then
+    read -r _ val < "$cache" 2>/dev/null || true
+    if (( now - $(gm_mtime "$cache") < 5 )); then
+      [[ $val == "-" ]] && return 1
+      printf '%s' "${val:-0}"; return 0
+    fi
+  fi
+  sid=$(gm_session_for_registry "$f" 2>/dev/null) || { printf '%s -\n' "$now" > "$cache"; return 1; }
+  val=$(gm_session_tokens_sid "$sid" 2>/dev/null) || { printf '%s -\n' "$now" > "$cache"; return 1; }
+  printf '%s %s\n' "$now" "$val" > "$cache"
+  printf '%s' "$val"
+}
+
+quota_rows() { [[ -f $GOQUOTA_CACHE ]] && cat "$GOQUOTA_CACHE" || true; }
+
+fmt_reset() { # iso kind
+  local iso=$1 kind=$2
+  [[ -z $iso || $iso == "-" ]] && { printf '—'; return; }
+  if [[ $kind == 5h ]]; then printf '%s' "${iso:11:5}"; else printf '%s' "${iso:5:5}"; fi
+}
+
+# ---------- 列内容（纯文本，无 ANSI；宽度自适应截断） ----------
+col_runs() { # colw out_file
+  local w=$1 out=$2
+  local -a files=()
+  local f id model started elapsed tok i=0 line now
+  local -i active queued=0
+  while IFS= read -r f; do [[ -n $f ]] && files+=("$f"); done < <(gm_active_runs)
+  active=${#files[@]}
+  (( active > GM_MAX_RUNS )) && queued=$((active - GM_MAX_RUNS))
+  {
+    printf '◤ RUNS  活跃 %s/%s' "$active" "$GM_MAX_RUNS"
+    (( queued > 0 )) && printf ' · 排队 %s' "$queued"
+    printf '\n'
+  } >> "$out"
+  now=$(gm_now)
+  for f in "${files[@]}"; do
+    i=$((i + 1))
+    id=$(gm_run_get "$f" .id "-"); model=$(gm_run_get "$f" .model "-")
+    started=$(gm_run_get "$f" .started 0)
+    local tmo; tmo=$(gm_run_get "$f" .timeout 0)
+    elapsed=$((now - started)); (( elapsed < 0 )) && elapsed=0
+    if (( i <= GM_MAX_RUNS )); then
+      if tok=$(run_tokens_cached "$f"); then tok=$(gm_fmt_tokens "$tok"); else tok="—"; fi
+      local pct=50
+      (( tmo > 0 )) && pct=$((elapsed * 100 / tmo))
+      (( pct > 100 )) && pct=100
+      printf '%s\n' "● $(gm_ell "$id" 10) $(gm_ell "$model" 16) $(gm_fmt_dur "$elapsed") $(pbar "$pct" 6) $tok" >> "$out"
+    else
+      printf '%s\n' "○ $(gm_ell "$id" 12) $(gm_ell "$model" 14) 排队中 $((i - GM_MAX_RUNS))" >> "$out"
+    fi
+  done
+  (( active == 0 )) && printf '（空闲）gm run --id … -- <命令>\n' >> "$out"
+  printf 'gm run / oc-run 登记任务自动上屏\n' >> "$out"
+}
+
+col_usage() { # colw out_file
+  local w=$1 out=$2 tn tv
+  printf '◤ USAGE 官方token（含缓存）\n' >> "$out"
+  if [[ ! -f $GOUSAGE_FILE ]]; then printf '首次查询中…\n' >> "$out"; return 0; fi
+  read -r ut uc wt wc < "$GOUSAGE_FILE" 2>/dev/null || true
+  if [[ -z ${ut:-} || $ut == 0 ]]; then printf '近7天暂无官方用量数据\n' >> "$out"; return 0; fi
+  printf '%s\n' "今日 $(gm_fmt_tokens "$ut") tok · $(usd "$uc")" >> "$out"
+  printf '%s\n' "7天  $(gm_fmt_tokens "$wt") tok · $(usd "$wc")" >> "$out"
+  printf '模型排行 · 7天token\n' >> "$out"
+  local -a tops=()
+  while IFS=$'\t' read -r tn tv; do
+    [[ -n $tn ]] && tops+=("$tn|$tv")
+  done < <(tail -n +2 "$GOUSAGE_FILE")
+  local mt idx pct
+  for ((idx = 0; idx < ${#tops[@]}; idx++)); do
+    mt=${tops[$idx]%%|*}; tv=${tops[$idx]##*|}
+    pct=0
+    (( wt > 0 )) && pct=$((tv * 100 / wt))
+    printf '%s\n' "$(pbar "$pct" 6) $(gm_ell "$mt" 18) $(gm_fmt_tokens "$tv")" >> "$out"
+    (( idx >= 9 )) && break
+  done
+}
+
+col_quota() { # colw out_file compact
+  local w=$1 out=$2 compact=${3:-0}
+  printf '◤ GO QUOTA %s套餐（已用%%·余量%%·重置UTC）\n' "$PLAN_NAME" >> "$out"
+  local acct st p5 r5 pw rw pm rm
+  local got=0
+  while IFS=$'\t' read -r acct st p5 r5 pw rw pm rm; do
+    [[ -z $acct ]] && continue
+    got=1
+    if [[ $st == key未填 ]]; then printf '%s key 未填\n' "$acct" >> "$out"; continue; fi
+    if [[ $st != ok ]]; then printf '%s 查询失败\n' "$acct" >> "$out"; continue; fi
+    if (( compact )); then
+      printf '%s\n' "$acct 5h$(pbar "$p5" 2) $p5% ↺$(fmt_reset "$r5" 5h)│周 $(pbar "$pw" 2) $pw% ↺$(fmt_reset "$rw" 周)│月 $(pbar "$pm" 2) $pm% ↺$(fmt_reset "$rm" 月)" >> "$out"
+    else
+      printf '%s 5h %s 已%s%% 余%s%% ↺%s\n' "$acct" "$(pbar "$p5" 8)" "$p5" "$((100 - p5))" "$(fmt_reset "$r5" 5h)" >> "$out"
+      printf '%s 周 %s 已%s%% 余%s%% ↺%s\n' "$acct" "$(pbar "$pw" 8)" "$pw" "$((100 - pw))" "$(fmt_reset "$rw" 周)" >> "$out"
+      printf '%s 月 %s 已%s%% 余%s%% ↺%s\n' "$acct" "$(pbar "$pm" 8)" "$pm" "$((100 - pm))" "$(fmt_reset "$rm" 月)" >> "$out"
+    fi
+  done < <(quota_rows)
+  (( got == 0 )) && printf '首次查询中…\n' >> "$out"
+}
+
+col_ledger() { # colw out_file n
+  local w=$1 out=$2 n=${3:-4}
+  printf '◤ LEDGER 台账\n' >> "$out"
+  if [[ -r $GM_LEDGER ]]; then
+    local card date result dur mark
+    tail -n "$n" "$GM_LEDGER" | awk -F, '{print $2"\t"$1"\t"$4"\t"$6}' \
+      | while IFS=$'\t' read -r date card result dur; do
+          mark="·"
+          case $result in *PASS*|*通过*) mark="✓" ;; *FAIL*|*失败*) mark="✗" ;; esac
+          printf '%s\n' "$(gm_cut "$date" 5) $(gm_ell "$card" 12) $mark $(gm_cut "$dur" 6)" >> "$out"
+        done
+  else
+    printf '台账不可得\n' >> "$out"
+  fi
+}
+
+# ---------- 渲染 ----------
+render() {
+  gm_term_size
+  local W=$GM_TERM_COLS H=$GM_TERM_LINES
+  local now active=0 tok_known=0 queued=0 tok
+  local -a files=()
+  local f
+
+  while IFS= read -r f; do [[ -n $f ]] && files+=("$f"); done < <(gm_active_runs)
+  active=${#files[@]}
+  (( active > GM_MAX_RUNS )) && queued=$((active - GM_MAX_RUNS))
+  for f in "${files[@]}"; do
+    if tok=$(run_tokens_cached "$f"); then tok_known=$((tok_known + 1)); fi
+  done
+
+  now=$(gm_now)
+  local buf="$SNAPSHOT.tmp.$$"
+  : > "$buf"
+
+  # ---- 顶栏（整行） ----
+  local head="◈ GHOSTTY MONITOR"
+  local mon_pid; mon_pid=$(cat "$GM_STATE/monitor.pid" 2>/dev/null || true)
+  if gm_alive "$mon_pid"; then head="$head ● LIVE"; else head="$head ● STOPPED"; fi
+  head="$head $(date '+%m-%d %H:%M:%S')"
+  head="$head 活跃 ${active}/${GM_MAX_RUNS}"
+  (( queued > 0 )) && head="$head 排队 ${queued}"
+  printf '%s\n' "$head" >> "$buf"
+  printf '\033[2m%s\033[0m\n' "$(printf '─%.0s' $(seq 1 "$W"))" >> "$buf"
+
+  # ---- 列布局 ----
+  local ncols=1
+  (( W >= 104 )) && ncols=2
+  (( W >= 150 )) && ncols=3
+  local sepw=$(( (ncols - 1) * 3 ))
+  local colw=$(( (W - 2 - sepw) / ncols ))
+  (( colw < 20 )) && colw=20
+  local body=$(( H - 4 ))
+
+  local c1="$GM_STATE/.u1.$$" c2="$GM_STATE/.u2.$$" c3="$GM_STATE/.u3.$$"
+  : > "$c1"; : > "$c2"; : > "$c3"
+
+  if (( ncols == 3 )); then
+    col_runs "$colw" "$c1"
+    col_usage "$colw" "$c2"
+    col_quota "$colw" "$c3" 0
+    col_ledger "$colw" "$c3" 8
+  elif (( ncols == 2 )); then
+    col_runs "$colw" "$c1"
+    col_ledger "$colw" "$c1" 4
+    col_usage "$colw" "$c2"
+    col_quota "$colw" "$c2" 1
+  else
+    col_runs "$colw" "$c1"
+    col_usage "$colw" "$c1"
+    col_quota "$colw" "$c1" 1
+    col_ledger "$colw" "$c1" 3
+  fi
+
+  # 合并列：python 按 CJK=2 的显示宽度精确截断/补齐（bash 3.2 无法可靠判断）
+  local banner; banner=$(tail -n 2 "$buf" | head -n 1)
+  : > "$buf"
+  python3 - "$colw" "$ncols" "$W" "$banner" "$c1" "$c2" "$c3" >> "$buf" <<'PY'
+import sys
+def dw(s):
+    t = 0
+    for c in s:
+        o = ord(c)
+        if (4352 <= o <= 4447) or (11904 <= o <= 12350) or (12353 <= o <= 13311) or \
+           (13312 <= o <= 19903) or (19968 <= o <= 40959) or (63744 <= o <= 64255) or \
+           (65280 <= o <= 65376) or (65504 <= o <= 65510) or o >= 131072:
+            t += 2
+        else:
+            t += 1
+    return t
+def trunc(s, w):
+    if dw(s) <= w:
+        return s
+    t = 0
+    for i, c in enumerate(s):
+        t += 2 if dw(c) == 2 else 1
+        if t > w:
+            return s[:i] + '…'
+    return s
+def pad(s, w):
+    return s + ' ' * max(0, w - dw(s))
+colw = int(sys.argv[1]); ncols = int(sys.argv[2]); W = int(sys.argv[3])
+print(trunc(sys.argv[4], W - 1))
+print('\033[2m' + '─' * W + '\033[0m')
+cols = []
+for path in sys.argv[5:5 + ncols]:
+    cols.append([trunc(l, colw) for l in open(path, encoding='utf-8', errors='replace').read().splitlines()])
+maxl = min(max(len(c) for c in cols), W - 3)
+sep = ' │ ' if ncols > 1 else ''
+for i in range(maxl):
+    if ncols == 1:
+        print(cols[0][i])
+    else:
+        print(sep.join(pad(c[i] if i < len(c) else '', colw) for c in cols))
+PY
+
+  rm -f "$c1" "$c2" "$c3"
+
+  # ---- 底栏 ----
+  printf '\033[2m%s\033[0m\n' "$(printf '─%.0s' $(seq 1 "$W"))" >> "$buf"
+  if (( W < 52 )); then
+    printf '\033[2m2s刷新 · gm stop 停止\033[0m' >> "$buf"
+  else
+    printf '\033[2m2s刷新 · 额度/用量缓存 %ss · gm stop 停止\033[0m' "$GM_GOSTATUS_TTL" >> "$buf"
+  fi
+
+  # ---- 着色（在拼好宽度的纯文本上） ----
+  perl -pe '
+    if (/^◤/) { s/^/\e[1;36m/; s/$/\e[0m/; }
+    s/●/\e[1;32m●\e[0m/g;
+    s/○/\e[1;33m○\e[0m/g;
+    s/^◈/\e[1;36m◈/;
+  ' "$buf" > "$buf.c.$$" 2>/dev/null && mv -f "$buf.c.$$" "$buf"
+
+  printf '\033[H\033[2J'
+  cat "$buf"
+  sed $'s/\033\\[[0-9;]*m//g; s/\033\\][^\a]*\a//g' "$buf" > "$SNAPSHOT.new.$$" 2>/dev/null \
+    && mv -f "$SNAPSHOT.new.$$" "$SNAPSHOT" 2>/dev/null
+  printf '%s %s\n' "$GM_TERM_COLS" "$GM_TERM_LINES" > "$GM_STATE/size-usage.txt" 2>/dev/null
+  rm -f "$buf"
+}
+
+trap 'exit 0' TERM INT
+while :; do
+  refresh_go_quota
+  render
+  sleep "$GM_POLL"
+done

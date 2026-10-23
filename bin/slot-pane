@@ -1,0 +1,45 @@
+#!/bin/bash
+# slot-pane <序号> — 空闲槽位占位 pane（保持网格形状，等待任务顶替）
+# 资源占用：每 3 秒重绘一次，无任何查询。
+
+set -uo pipefail
+GM_HOME_ARG=""
+ARGS=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -H) GM_HOME_ARG=${2:-}; shift 2 ;;
+    *) ARGS+=("$1"); shift ;;
+  esac
+done
+[[ -n $GM_HOME_ARG ]] && export GM_HOME=$GM_HOME_ARG
+source "$(cd "$(dirname "$0")" && pwd)/gm-lib.sh"
+
+printf "%s\n" "$*" >> /tmp/slotargs.log
+IDX=${ARGS[0]:-0}
+HB="$GM_STATE/hb/slot-$IDX"
+
+printf '\033]0;空闲槽位 %s\033\\' "$IDX"
+
+render() {
+  gm_term_size
+  local mid=$((GM_TERM_LINES / 2))
+  printf '%s %s\n' "$GM_TERM_COLS" "$GM_TERM_LINES" > "$GM_STATE/size-slot-$IDX.txt" 2>/dev/null
+  printf '\033[H\033[2J'
+  local i
+  for ((i = 0; i < mid - 2; i++)); do printf '\n'; done
+  printf '\033[2m              ◇\033[0m\n\n'
+  printf '\033[1;36m        空闲槽位 %s\033[0m\n' "$IDX"
+  printf '\033[2m    等待任务分配…\033[0m\n\n'
+  printf '\033[2m  新任务用 oc-run / gm run 登记\033[0m\n'
+  printf '\033[2m  会自动顶替这个空位\033[0m'
+}
+
+pty_alive() { stty size </dev/tty >/dev/null 2>&1; }
+
+trap 'rm -f "$HB"; exit 0' TERM INT
+while :; do
+  pty_alive || { rm -f "$HB"; exit 0; }   # pane 已被关闭 → 自杀，不留孤儿
+  touch "$HB"
+  render
+  sleep 3
+done

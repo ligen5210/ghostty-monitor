@@ -1,0 +1,530 @@
+#!/bin/bash
+# monitor — 常驻监控进程：轮询注册表，维护 Ghostty 自适应网格。
+#
+# 网格（总格数 = 用量 pane + 对话 pane）：
+#   N=1  仅用量
+#   N=2  2 列 × 1 行（用量 | run1）
+#   N=3  3 列 × 1 行
+#   N=4  2 列 × 2 行（2x2）
+#   N=5  3 列 × 2 行（第三列通高）
+#   N=6  3 列 × 2 行（3x2）
+#   N=7  4 列 × 2 行（第四列通高）
+#   N=8  4 列 × 2 行（4x2）
+# 每次建完网格调用 equalize_splits，保证格子宽高尽量均等。
+#
+# 活跃 run 上限 GM_MAX_RUNS（默认 7），超出的在用量面板显示“排队中 N”。
+# 活跃集合变化时重建对话 pane 网格（用量 pane 不动）；watcher 从会话数据库重放，
+# 重连无数据损失。
+
+set -o pipefail
+source "$(cd "$(dirname "$0")" && pwd)/gm-lib.sh"
+
+ONCE=0
+[[ ${1:-} == --once ]] && ONCE=1
+
+MAX=$GM_MAX_RUNS
+POLL=$GM_POLL
+DASH="$GM_STATE/dashboard.tsv"   # window_id \t usage_terminal \t created
+GRID="$GM_STATE/grid.tsv"        # cell_index \t run_id \t terminal_id \t created
+SIGF="$GM_STATE/layout.sig"
+PIDFILE="$GM_STATE/monitor.pid"
+LOG="$GM_LOGS/monitor.log"
+
+touch "$GRID" "$LOG"
+[[ $(stat -f %z "$LOG" 2>/dev/null || echo 0) -gt 1048576 ]] && tail -n 2000 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+
+log() { printf '[%s] %s\n' "$(date '+%m-%d %H:%M:%S')" "$*" >> "$LOG"; }
+
+# ---------- 单实例 ----------
+if [[ -f $PIDFILE ]]; then
+  old=$(cat "$PIDFILE" 2>/dev/null || true)
+  if gm_alive "$old" && gm_is_cmd "$old" "bin/monitor" && [[ $old != $$ ]]; then
+    echo "monitor 已在运行（pid ${old}，pidfile ${PIDFILE}）" >&2
+    exit 1
+  fi
+fi
+echo $$ > "$PIDFILE"
+
+cleanup() { [[ $(cat "$PIDFILE" 2>/dev/null) == $$ ]] && rm -f "$PIDFILE"; }
+trap cleanup EXIT
+trap 'log "收到 TERM/INT，退出"; exit 0' TERM INT
+
+# ---------- AppleScript ----------
+AS_ERR="$GM_LOGS/applescript.err"
+
+as_list() {
+  osascript - 2>>"$AS_ERR" <<'AS'
+on run argv
+  tell application "Ghostty"
+    set out to ""
+    repeat with w in windows
+      set wid to (id of w)
+      set out to out & "W|" & wid & linefeed
+      repeat with t in terminals of w
+        set out to out & "T|" & (id of t) & "|" & wid & linefeed
+      end repeat
+    end repeat
+    return out
+  end tell
+end run
+AS
+}
+
+as_new_window() { # cmd env... fontsize（最后一个不含 = 的参数）
+  osascript - "$@" 2>>"$AS_ERR" <<'AS'
+on run argv
+  set cmd to item 1 of argv
+  set envs to {}
+  set fsize to ""
+  repeat with i from 2 to (count of argv)
+    set v to item i of argv
+    if v contains "=" then
+      set end of envs to v
+    else
+      set fsize to v
+    end if
+  end repeat
+  tell application "Ghostty"
+    set cfg to new surface configuration
+    set command of cfg to cmd
+    set wait after command of cfg to false
+    set environment variables of cfg to envs
+    if fsize is not "" then set font size of cfg to (fsize as integer)
+    set w to new window with configuration cfg
+    set t to focused terminal of selected tab of w
+    return (id of w) & "|" & (id of t)
+  end tell
+end run
+AS
+}
+
+as_split() { # anchor_id direction cmd env...
+  osascript - "$@" 2>>"$AS_ERR" <<'AS'
+on run argv
+  set aid to item 1 of argv
+  set dir to item 2 of argv
+  set cmd to item 3 of argv
+  set envs to {}
+  repeat with i from 4 to (count of argv)
+    set end of envs to item i of argv
+  end repeat
+  tell application "Ghostty"
+    set cfg to new surface configuration
+    set command of cfg to cmd
+    set wait after command of cfg to false
+    set environment variables of cfg to envs
+    set font size of cfg to 9
+    set t to terminal id aid
+    if dir is "right" then
+      set nt to split t direction right with configuration cfg
+    else if dir is "down" then
+      set nt to split t direction down with configuration cfg
+    else if dir is "up" then
+      set nt to split t direction up with configuration cfg
+    else
+      set nt to split t direction left with configuration cfg
+    end if
+    return id of nt
+  end tell
+end run
+AS
+}
+
+as_close_terminal() {
+  osascript - "$1" 2>>"$AS_ERR" <<'AS' >/dev/null
+on run argv
+  tell application "Ghostty"
+    close (terminal id (item 1 of argv))
+  end tell
+end run
+AS
+}
+
+as_maximize() { # anchor_id —— 最大化窗口（面板尽量占满屏幕）
+  osascript - "$1" 2>>"$AS_ERR" <<'AS' >/dev/null
+on run argv
+  tell application "Ghostty"
+    perform action "toggle_maximize" on (terminal id (item 1 of argv))
+  end tell
+end run
+AS
+}
+
+as_close_window() {
+  osascript - "$1" 2>>"$AS_ERR" <<'AS' >/dev/null
+on run argv
+  tell application "Ghostty"
+    close window (window id (item 1 of argv))
+  end tell
+end run
+AS
+}
+
+as_equalize() { # anchor_id
+  osascript - "$1" 2>>"$AS_ERR" <<'AS' >/dev/null
+on run argv
+  tell application "Ghostty"
+    perform action "equalize_splits" on (terminal id (item 1 of argv))
+  end tell
+end run
+AS
+}
+
+ghostty_running() { pgrep -f "Ghostty.app/Contents/MacOS/ghostty" >/dev/null 2>&1; }
+
+# 关闭遗留的监控窗口（monitor 单实例，同名的都是历史残留）
+close_stale_dashboards() {
+  osascript - 2>>"$AS_ERR" <<'AS' >/dev/null
+on run argv
+  tell application "Ghostty"
+    set doomed to {}
+    repeat with w in windows
+      set mine to false
+      repeat with t in terminals of w
+        if (name of t) contains "Ghostty Monitor" or (name of t) contains "空闲槽位" or (name of t) contains "· 对话" then
+          set mine to true
+          exit repeat
+        end if
+      end repeat
+      if mine then set end of doomed to (id of w)
+    end repeat
+    repeat with wid in doomed
+      try
+        close window (window id wid)
+      end try
+    end repeat
+    return count of doomed
+  end tell
+end run
+AS
+}
+
+# ---------- 状态 ----------
+read_dash() {
+  DWID=""; DTERM=""; DCREATED=0
+  [[ -f $DASH ]] || return 0
+  IFS=$'\t' read -r DWID DTERM DCREATED < "$DASH" 2>/dev/null || true
+}
+write_dash() { printf '%s\t%s\t%s\n' "$1" "$2" "$3" | gm_atomic_write "$DASH"; }
+
+GRID_CELLS=(); GRID_KINDS=(); GRID_IDS=(); GRID_TERMS=()
+load_grid() {
+  GRID_CELLS=(); GRID_KINDS=(); GRID_IDS=(); GRID_TERMS=()
+  local c k id t created
+  while IFS=$'\t' read -r c k id t created; do
+    [[ -z $c ]] && continue
+    GRID_CELLS+=("$c"); GRID_KINDS+=("$k"); GRID_IDS+=("$id"); GRID_TERMS+=("$t")
+  done < "$GRID"
+}
+save_grid() {
+  local i tmp="$GRID.tmp.$$"
+  : > "$tmp"
+  for ((i = 0; i < ${#GRID_CELLS[@]}; i++)); do
+    printf '%s\t%s\t%s\t%s\t%s\n' "${GRID_CELLS[$i]}" "${GRID_KINDS[$i]}" "${GRID_IDS[$i]}" "${GRID_TERMS[$i]}" "$(gm_now)" >> "$tmp"
+  done
+  mv -f "$tmp" "$GRID"
+}
+
+is_live_term() {
+  local t=$1 x
+  while IFS= read -r x; do [[ $x == "$t" ]] && return 0; done < <(echo "$LIVE_LIST" | sed -n 's/^T|\([^|]*\)|.*/\1/p')
+  return 1
+}
+is_live_window() {
+  local w=$1 x
+  while IFS= read -r x; do [[ $x == "$w" ]] && return 0; done < <(echo "$LIVE_LIST" | sed -n 's/^W|//p')
+  return 1
+}
+term_window() { echo "$LIVE_LIST" | awk -F'|' -v t="$1" '$1=="T" && $2==t {print $3; exit}'; }
+
+create_dashboard() {
+  local prev out
+  prev=$(gm_front_bundle)
+  local launcher="$GM_STATE/launch-usage.sh"
+  cat > "$launcher" <<EOF
+#!/bin/bash
+export GM_HOME='$GM_HOME' GM_MAX_RUNS='$MAX' GM_POLL='$POLL'
+export GM_GOSTATUS='$GM_GOSTATUS' GM_LEDGER='$GM_LEDGER' GM_OPENCODE_DB='$GM_OPENCODE_DB'
+exec '$GM_ROOT/bin/usage-pane'
+EOF
+  chmod +x "$launcher"
+  out=$(as_new_window "$launcher" \
+    "GM_HOME=$GM_HOME" "GM_MAX_RUNS=$MAX" "GM_POLL=$POLL" \
+    "GM_GOSTATUS=$GM_GOSTATUS" "GM_LEDGER=$GM_LEDGER" \
+    "GM_OPENCODE_DB=$GM_OPENCODE_DB" "PATH=$PATH" "9")
+  if [[ $out != *"|"* ]]; then
+    log "创建监控窗口失败（osascript 输出: ${out:-空}）"
+    return 1
+  fi
+  DWID=${out%%|*}
+  DTERM=${out#*|}
+  DCREATED=$(gm_now)
+  write_dash "$DWID" "$DTERM" "$DCREATED"
+  LIVE_LIST="${LIVE_LIST}W|${DWID}"$'\n'"T|${DTERM}|${DWID}"$'\n'
+  log "创建监控窗口 window=$DWID usage_terminal=$DTERM（字号9自适应宽度）"
+  if [[ -n $prev && $prev != com.mitchellh.ghostty ]]; then
+    open -b "$prev" >/dev/null 2>&1 || true
+  fi
+  return 0
+}
+
+close_grid() {
+  local i t live=0
+  load_grid
+  for ((i = 0; i < ${#GRID_TERMS[@]}; i++)); do
+    t=${GRID_TERMS[$i]}
+    if is_live_term "$t"; then
+      as_close_terminal "$t"
+      live=$((live + 1))
+    fi
+    rm -f "$GM_STATE/hb/${GRID_IDS[$i]}"
+  done
+  GRID_CELLS=(); GRID_KINDS=(); GRID_IDS=(); GRID_TERMS=()
+  : > "$GRID"
+  (( live > 0 )) && log "关闭旧对话 pane ${live} 个"
+}
+
+# 层级：默认 4 格（2x2）；4-5 个 run → 6 格（3x2）；6-7 个 → 8 格（4x2）
+cells_for() { local a=$1; if (( a <= 3 )); then echo 4; elif (( a <= 5 )); then echo 6; else echo 8; fi; }
+layout_dims() { # N -> "cols bottoms"
+  case $1 in
+    4) echo "2 2" ;;
+    6) echo "3 3" ;;
+    *) echo "4 4" ;;
+  esac
+}
+
+# 给 cell 建 pane：kind=run 用 pane-watcher，kind=slot 用 slot-pane
+# 通过 launcher 脚本传配置：Ghostty 会吞掉以 - 开头的命令参数，
+# surface 环境变量在快速分屏时也可能丢失，所以不依赖两者。
+split_cell() { # anchor dir kind id cell
+  local anchor=$1 dir=$2 kind=$3 id=$4 cell=$5 tid cmd inner
+  if [[ $kind == run ]]; then
+    inner="exec '$GM_ROOT/bin/pane-watcher' '$id'"
+  else
+    inner="exec '$GM_ROOT/bin/slot-pane' '$cell'"
+  fi
+  cmd="$GM_STATE/launch-$id.sh"
+  cat > "$cmd" <<EOF
+#!/bin/bash
+export GM_HOME='$GM_HOME' GM_MAX_RUNS='$MAX' GM_POLL='$POLL'
+export GM_GOSTATUS='$GM_GOSTATUS' GM_LEDGER='$GM_LEDGER' GM_OPENCODE_DB='$GM_OPENCODE_DB'
+$inner
+EOF
+  chmod +x "$cmd"
+  rm -f "$GM_STATE/hb/$id"
+  tid=$(as_split "$anchor" "$dir" "$cmd" \
+    "GM_HOME=$GM_HOME" "GM_MAX_RUNS=$MAX" "GM_POLL=$POLL" \
+    "GM_GOSTATUS=$GM_GOSTATUS" "GM_LEDGER=$GM_LEDGER" \
+    "GM_OPENCODE_DB=$GM_OPENCODE_DB" "PATH=$PATH")
+  if [[ -z $tid ]]; then
+    log "为 $id 建 pane 失败（anchor=$anchor dir=$dir cell=${cell}）"
+    return 1
+  fi
+  LIVE_LIST="${LIVE_LIST}T|${tid}|${DWID}"$'\n'
+  GRID_CELLS+=("$cell"); GRID_KINDS+=("$kind"); GRID_IDS+=("$id"); GRID_TERMS+=("$tid")
+  save_grid
+  return 0
+}
+
+build_grid() { # run_file...
+  local -a runs
+  runs=("$@")
+  local n
+  n=$(cells_for "${#runs[@]}")
+  local dims cols bottoms c j cell anchor
+  dims=$(layout_dims "$n")
+  cols=${dims%% *}; bottoms=${dims#* }
+
+  GRID_CELLS=(); GRID_KINDS=(); GRID_IDS=(); GRID_TERMS=()
+  : > "$GRID"
+
+  # 第一列第一行 = 用量 pane
+  local -a TOP_TERMS
+  TOP_TERMS[0]=$DTERM
+
+  # 顶行：向右补列
+  for ((c = 1; c < cols; c++)); do
+    cell=$c
+    anchor=${TOP_TERMS[$((c - 1))]}
+    if [[ $c -le ${#runs[@]} ]]; then
+      split_cell "$anchor" "right" "run" "$(gm_run_get "${runs[$((c - 1))]}" .id)" "$cell" || return 1
+    else
+      split_cell "$anchor" "right" "slot" "slot-$cell" "$cell" || return 1
+    fi
+    TOP_TERMS[$c]=${GRID_TERMS[${#GRID_TERMS[@]} - 1]}
+  done
+
+  # 底行：对前 bottoms 列下分
+  for ((j = 0; j < bottoms; j++)); do
+    cell=$((cols + j))
+    anchor=${TOP_TERMS[$j]}
+    if [[ $cell -le ${#runs[@]} ]]; then
+      split_cell "$anchor" "down" "run" "$(gm_run_get "${runs[$((cell - 1))]}" .id)" "$cell" || return 1
+    else
+      split_cell "$anchor" "down" "slot" "slot-$cell" "$cell" || return 1
+    fi
+  done
+
+  as_equalize "$DTERM"
+  local nruns=${#runs[@]}
+  local nslot=$(( n - 1 - nruns ))
+  log "布局 ${n} 格：${cols} 列 × 2 行，run ${nruns} 个 + 空位 ${nslot} 个"
+  return 0
+}
+
+last_rebuild=0
+
+reconcile() {
+  find "$GM_STATE" -name 'launch-*.sh' -mmin +1 -delete 2>/dev/null || true
+  LIVE_LIST=$(as_list)
+  if [[ -z $LIVE_LIST ]]; then
+    log "osascript 读取 Ghostty 状态失败（检查自动化权限）"
+    return 1
+  fi
+  read_dash
+
+  # 1) 监控窗口校验
+  if [[ -z $DWID ]] || ! is_live_window "$DWID" || ! is_live_term "$DTERM" \
+     || [[ $(term_window "$DTERM") != "$DWID" ]]; then
+    if [[ -n $DWID ]] && is_live_window "$DWID"; then
+      log "用量 pane 丢失，重建监控窗口（旧 window=${DWID}）"
+      close_grid
+      as_close_window "$DWID"
+    else
+      log "监控窗口不存在，新建"
+    fi
+    create_dashboard || return 1
+    : > "$GRID"
+    rm -f "$SIGF"
+  fi
+
+  # 2) 活跃 run（按 started）→ 取前 MAX 个上墙
+  local -a active wall
+  active=(); wall=()
+  local f
+  while IFS= read -r f; do [[ -n $f ]] && active+=("$f"); done < <(gm_active_runs)
+  local i=0
+  for f in "${active[@]}"; do
+    (( i >= MAX )) && break
+    wall+=("$f"); i=$((i + 1))
+  done
+
+  # 2b) DB 自动发现：原生 opencode 会话（跑批器不改一行也能上屏）
+  #     GM_DB_DISCOVER=0 可关闭（验收等需要隔离场景）
+  local nowv; nowv=$(gm_now)
+  if [[ ${GM_DB_DISCOVER:-1} == 0 ]]; then return 0; fi
+  local cutoff_ms=$(( (nowv - 600) * 1000 ))
+  local bound; bound=" $(cat "$GM_STATE"/session-* 2>/dev/null | tr '\n' ' ') "
+  local sid dir title model created updated s8 rf
+  while IFS=$'\t' read -r sid dir title model created updated; do
+    { echo "DBG sid=[$sid] dir=[$dir] model=[$model] created=[$created] updated=[$updated]"; } >> /tmp/dbloop.log
+    [[ -n $sid ]] || continue
+    case "$bound" in *" $sid "*) continue ;; esac
+    s8="db-${sid: -8}"
+    rf="$GM_RUNS/$s8.json"
+    if [[ ! -f $rf ]]; then
+      jq -n --arg id "$s8" --arg model "${model:-opencode}" \
+        --arg card "$(gm_cut "${title:-opencode 会话}" 40)" --arg cwd "${dir:-/tmp}" \
+        --argjson started "$(( created / 1000 ))" --arg sid "$sid" \
+        '{id:$id,model:$model,card:$card,log:"",pid:0,started:$started,status:"running",cwd:$cwd,timeout:0,exit:0,source:"db",session:$sid}' > "$rf"
+      printf '%s' "$sid" > "$GM_STATE/session-$s8"
+      log "DB 发现 opencode 会话（${dir}）→ 登记 ${s8}"
+    fi
+    if (( updated < (nowv - 120) * 1000 )); then
+      if [[ $(gm_run_get "$rf" .status "") == running ]]; then
+        jq '.status="done"' "$rf" > "$rf.t" && mv -f "$rf.t" "$rf"
+        log "DB 会话 ${s8} 已结束"
+      fi
+      continue
+    fi
+    wall+=("$rf")
+    bound="$bound$sid "
+  done < <(gm_db_sessions "$cutoff_ms")
+
+  # 2c) 会话行已从 DB 删除的伪 run → 标 done（opencode 会清理失败/临时会话）
+  for rf in "$GM_RUNS"/db-*.json; do
+    [[ -f $rf ]] || continue
+    [[ $(gm_run_get "$rf" .status "") == running ]] || continue
+    local dsid; dsid=$(gm_run_get "$rf" .session "")
+    [[ -n $dsid ]] || continue
+    local exists
+    exists=$(sqlite3 -readonly "$GM_OPENCODE_DB" "select 1 from session_v2 where id='$dsid';" 2>/dev/null)
+    [[ $exists == 1 ]] || { jq '.status="done"' "$rf" > "$rf.t" && mv -f "$rf.t" "$rf"; log "DB 会话 $dsid 已被移除，标记 ${dsid:0:12} 完成"; }
+  done
+
+  local sig=""
+  for f in "${wall[@]}"; do sig="$sig$(gm_run_get "$f" .id),"; done
+  local tier
+  tier=$(cells_for "${#wall[@]}")
+  sig="${tier}|${sig}"
+
+  # 3) 网格校验：每格都必须活着（run 格对号入座，slot 格心跳正常）
+  load_grid
+  local grid_ok=1
+  local nowv want=$(( tier - 1 ))
+  nowv=$(gm_now)
+  if (( ${#GRID_TERMS[@]} != want )); then
+    grid_ok=0
+  else
+    for ((i = 0; i < ${#GRID_TERMS[@]}; i++)); do
+      local gid=${GRID_IDS[$i]} gkind=${GRID_KINDS[$i]}
+      is_live_term "${GRID_TERMS[$i]}" || grid_ok=0
+      [[ $(term_window "${GRID_TERMS[$i]}") == "$DWID" ]] || grid_ok=0
+      if [[ $gkind == run ]]; then
+        [[ $(gm_run_get "${wall[$i]}" .id "") == "$gid" ]] || grid_ok=0
+      else
+        [[ $gkind == slot && $gid == "slot-${GRID_CELLS[$i]}" ]] || grid_ok=0
+      fi
+      if (( grid_ok )); then
+        local age=$(( nowv - $(gm_mtime "$GM_STATE/hb/$gid") ))
+        if (( nowv - last_rebuild > 6 && age > 6 )); then
+          local rc="$GM_STATE/rebuild-$gid" rn
+          rn=$(cat "$rc" 2>/dev/null || true)
+          rn=${rn:-0}
+          if (( rn < 3 )); then
+            echo $((rn + 1)) > "$rc"
+            log "pane $gid 心跳 ${age}s 未更新，触发重建（第 $((rn + 1)) 次）"
+            grid_ok=0
+          fi
+        fi
+      fi
+    done
+  fi
+
+  local need=0
+  if (( grid_ok == 0 )); then need=1; fi
+  if [[ -f $SIGF ]]; then
+    [[ $(cat "$SIGF" 2>/dev/null) == "$sig" ]] || need=1
+  else
+    need=1
+  fi
+  if (( need )); then
+    local now; now=$(gm_now)
+    if (( now - last_rebuild < 1 )); then return 0; fi
+    last_rebuild=$now
+    close_grid
+    rm -rf "$GM_STATE"/rebuild-* 2>/dev/null || true
+    build_grid "${wall[@]}" || { log "网格构建中断，下轮重试"; return 1; }
+    printf '%s' "$sig" | gm_atomic_write "$SIGF"
+  fi
+  return 0
+}
+
+# ---------- 主循环 ----------
+ghostty_running || { log "Ghostty 未运行，尝试启动"; open -a Ghostty >/dev/null 2>&1; sleep 2; }
+find "$GM_STATE" -name 'launch-*.sh' -mtime +0 -delete 2>/dev/null || true
+stale=$(close_stale_dashboards 2>/dev/null)
+[[ -n $stale && $stale != 0 ]] && log "清理遗留监控窗口 ${stale} 个"
+log "monitor 启动 pid=$$（对话上限 ${MAX}，轮询 ${POLL}s，GM_HOME=${GM_HOME}）"
+
+reconcile
+if (( ONCE )); then
+  log "monitor --once 完成，退出"
+  exit 0
+fi
+
+while :; do
+  sleep "$POLL"
+  reconcile
+done

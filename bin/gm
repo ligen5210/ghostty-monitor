@@ -1,0 +1,87 @@
+#!/bin/bash
+# gm — ghostty-monitor 的日常入口（装到 ~/.local/bin 后直接敲 gm）
+#
+#   gm                    启动/聚焦监控面板（已运行则直接切到面板）
+#   gm run --id … -- …    启动面板 + 执行 oc-run（一条命令连任务一起起）
+#   gm status             状态
+#   gm stop               停止并关闭面板
+#   gm open <id>          用 opencode 本体打开该 run 的会话
+#   gm logs               看 monitor 日志
+#   gm doctor             环境自检
+#
+# 其余子命令原样转给 gmctl。
+
+set -uo pipefail
+source "$(cd "$(dirname "$0")" && pwd)/gm-lib.sh"
+
+ensure_started() {
+  local p i=0
+  p=$(cat "$GM_STATE/monitor.pid" 2>/dev/null || true)
+  if gm_alive "$p" && gm_is_cmd "$p" "bin/monitor"; then return 0; fi
+  nohup "$GM_ROOT/bin/monitor" >> "$GM_LOGS/monitor.out" 2>&1 &
+  while (( i < 24 )); do
+    p=$(cat "$GM_STATE/monitor.pid" 2>/dev/null || true)
+    gm_alive "$p" && return 0
+    sleep 0.25; i=$((i + 1))
+  done
+  return 1
+}
+
+dashboard_window() {
+  [[ -f $GM_STATE/dashboard.tsv ]] || return 1
+  cut -f1 "$GM_STATE/dashboard.tsv"
+}
+
+activate_dashboard() {
+  local wid
+  wid=$(dashboard_window) || return 1
+  [[ -n $wid ]] || return 1
+  osascript - "$wid" 2>/dev/null <<'AS' >/dev/null
+on run argv
+  tell application "Ghostty"
+    activate window (window id (item 1 of argv))
+  end tell
+end run
+AS
+}
+
+one_line_status() {
+  local active=0 p
+  active=$(gm_active_runs | grep -c . 2>/dev/null || true)
+  active=${active:-0}
+  p=$(cat "$GM_STATE/monitor.pid" 2>/dev/null || true)
+  printf '◈ Ghostty Monitor 就绪 · 活跃 %s/%s · monitor pid %s\n' "$active" "$GM_MAX_RUNS" "${p:-?}"
+}
+
+case ${1:-} in
+  ""|up|start)
+    if ensure_started; then
+      activate_dashboard
+      one_line_status
+      echo "  任务用 oc-run 登记即可自动上屏；gm run --id … -- opencode run … 可一条命令连任务一起起"
+    else
+      echo "启动失败，见 $GM_LOGS/monitor.log" >&2
+      exit 1
+    fi
+    ;;
+  ensure)
+    ensure_started
+    ;;
+  run)
+    shift
+    ensure_started || { echo "监控启动失败，见 $GM_LOGS/monitor.log" >&2; exit 1; }
+    exec "$GM_ROOT/bin/oc-run" "$@"
+    ;;
+  logs)
+    tail -n 40 "$GM_LOGS/monitor.log" 2>/dev/null || echo "暂无日志"
+    ;;
+  status|stop|open|doctor|attach)
+    exec "$GM_ROOT/bin/gmctl" "$@"
+    ;;
+  help|-h|--help)
+    sed -n '2,16p' "$0"
+    ;;
+  *)
+    exec "$GM_ROOT/bin/gmctl" "$@"
+    ;;
+esac
