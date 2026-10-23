@@ -128,6 +128,13 @@ logs/ cache/     日志与 go-status 缓存（运行期）
 
 数据根目录默认=本仓库，`GM_HOME` 可覆盖（测试隔离）。
 
+## 同步与镜像
+
+仓库托管在本地 Linux 服务器的 Gitea（origin），Gitea 配置推送镜像同步到 GitHub
+（ligen5210/ghostty-monitor）。首次镜像需在 Gitea 网页配置一次：
+仓库 Settings → 推送镜像 → 添加 `github.com` + 账号 `ligen5210` + Token。
+本机 SSH 直推 GitHub 也可用（`git push github main`）。
+
 ## 快速开始（优雅启动）
 
 ```bash

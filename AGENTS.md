@@ -42,6 +42,8 @@
 - 不修改 `/Volumes/移动硬盘/dev/mojing`（只读参考跑批器接口）。
 - 不修改 opencode 配置/凭据；不碰 `dev/secrets` 下 Key（`go-status.sh` 只读调用）。
 - 不 commit / push，除非用户明确要求。
+- 本仓库推送流程：origin = 本地 Linux Gitea（192.168.31.207:3300/dagen/ghostty-monitor），
+  由 Gitea 推送镜像同步到 GitHub（ligen5210/ghostty-monitor）；本机 SSH 直推 GitHub 也可用。
 - 同时运行多个 Ghostty 实例会让 AppleScript 目标不确定；不要用 `open -na` 起实例。
 - 不要用 `kill -0 0` / `kill 0`（会命中整个进程组）；进程校验统一走 `gm_alive`。
 
