@@ -1,13 +1,11 @@
 #!/bin/bash
-# pane-watcher <run-id> — 对话 pane：渲染 opencode 会话的**真实对话**。
+# pane-watcher <run-id> — 对话 pane：渲染 opencode 会话的真实对话与思考流。
 #
-# 数据源：~/.local/share/opencode/opencode.db 的 session_message 表
-#   user / assistant(text|reasoning|tool) / system / idle / compaction
-# 每秒重绘，始终显示最近一屏；run 结束后渲染终态并退出（pane 由 monitor 关闭）。
-# 同时输出纯文本快照 state/chat-<id>.txt，供测试和外部查看。
+# 数据源：session_message 表（user/assistant(text|reasoning|tool)/system/idle）
+# 每秒无闪烁重绘（逐行刷新，无全屏白闪）；run 结束渲染终态后退出。
+# 纯文本快照写 state/chat-<id>.txt。
 
-set -uo pipefail
-# -H <home>：显式指定 GM_HOME（surface 环境变量在快速分屏时可能被 Ghostty 丢弃）
+set -o pipefail
 GM_HOME_ARG=""
 ARGS=()
 while [[ $# -gt 0 ]]; do
@@ -34,10 +32,10 @@ TOK=""; TOK_AT=0; MSGS=""
 cleanup_tmp() { rm -f "$BUF" "$HEADF" "$BODYF"; }
 trap cleanup_tmp EXIT
 
-printf '\033]0;%s · 对话\033\\' "$ID"
+pty_alive() { stty size </dev/tty >/dev/null 2>&1; }
 
-# ---------- 渲染小工具 ----------
-emit_text() { # label color text
+
+emit_text() { # label color text（多行文本，首行带标签）
   local label=$1 color=$2 text=$3 w=$((GM_TERM_COLS - 4)) first=1 ln
   (( w < 24 )) && w=24
   [[ -z $text ]] && return 0
@@ -52,7 +50,7 @@ emit_text() { # label color text
   printf '\n'
 }
 
-emit_dim() { # text
+emit_dim() {
   local w=$((GM_TERM_COLS - 4)) ln
   (( w < 24 )) && w=24
   printf '%s\n' "$1" | fold -s -w "$w" | while IFS= read -r ln; do
@@ -75,21 +73,15 @@ emit_tool() { # name status arg output
   printf '\n'
 }
 
-# ---------- 会话消息 → 角色行 ----------
-fetch_messages() { # sid
+render_messages() { # sid -> 角色标记行
   local sid=$1 esc db=$GM_OPENCODE_DB
   esc=${sid//\'/\'\'}
   sqlite3 -readonly "$db" \
     "select json_object('seq',seq,'type',type,'data',json(data))
        from session_message
       where session_id='$esc'
-      order by seq desc limit 40;" 2>/dev/null
-}
-
-render_messages() { # sid
-  local sid=$1 esc db=$GM_OPENCODE_DB
-  esc=${sid//\'/\'\'}
-  fetch_messages "$sid" | jq -s -r '
+      order by seq desc limit 40;" 2>/dev/null \
+  | jq -s -r '
     reverse[] as $m | ($m.data // {}) as $d |
     if $m.type == "user" then
       (($d.text // "") | gsub("\t"; "  ") | split("\n")[]) | "U\t" + .
@@ -98,7 +90,9 @@ render_messages() { # sid
       if $p.type == "text" then
         (($p.text // "") | gsub("\t"; "  ") | split("\n")[]) | "A\t" + .
       elif $p.type == "reasoning" then
-        "R\t" + (($p.text // "") | gsub("\t"; " ") | gsub("\\s+"; " ") | .[0:600])
+        (($p.text // "") | gsub("\t"; "  ") | split("\n")) as $L |
+        ($L | length) as $n |
+        ($L | .[(if $n > 8 then $n - 8 else 0 end):][:8][]) | "R\t" + (if . == "" then " " else . end)
       elif $p.type == "tool" then
         (($p.state.input.command // $p.state.input.filePath // $p.state.input.pattern
           // $p.state.input.url // ($p.state.input | tostring))
@@ -119,10 +113,9 @@ render_messages() { # sid
   ' 2>/dev/null
 }
 
-# ---------- 主渲染 ----------
 render() { # status model card elapsed active sid code
   local status=$1 model=$2 card=$3 elapsed=$4 active=$5 sid=$6 code=$7
-  local state_text color line
+  local state_text color
 
   if (( active )); then
     state_text="运行中"; color='1;32'
@@ -132,15 +125,18 @@ render() { # status model card elapsed active sid code
     state_text="失败($status)"; color='1;31'
   fi
 
+  printf '\033]0;%s · %s\033\\' "$(gm_cut "${card_disp:-${card:-会话}}" 34)" "$(gm_cut "${model:-}" 22)"
   : > "$HEADF"
-  printf '\033[1;36m▌%s\033[0m \033[2m%s\033[0m\n' "$(gm_ell "$card" $((GM_TERM_COLS - 8)))" "$ID" >> "$HEADF"
+  printf '\033[1;36m▌%s\033[0m \033[2m%s\033[0m\n' "$(gm_ell "$card_disp" $((GM_TERM_COLS - 10)))" "$ID" >> "$HEADF"
   if (( GM_TERM_COLS >= 55 )); then
+    local agent_txt=""
+    [[ -n ${AGENT:-} ]] && agent_txt=" · $(gm_ell "$AGENT" 14)"
     if (( active )); then
-      printf '\033[%sm● %s\033[0m · %s · %s · tok %s · 消息 %s\n' \
-        "$color" "$state_text" "$(gm_ell "$model" 26)" "$(gm_fmt_dur "$elapsed")" "${TOK:-—}" "${MSGS:-—}" >> "$HEADF"
+      printf '\033[%sm● %s\033[0m · %s%s · %s · tok %s · 消息 %s\n' \
+        "$color" "$state_text" "$(gm_ell "$model" 22)" "$agent_txt" "$(gm_fmt_dur "$elapsed")" "${TOK:-—}" "${MSGS:-—}" >> "$HEADF"
     else
-      printf '\033[%sm%s\033[0m · %s · 用时 %s · exit %s · tok %s · 消息 %s\n' \
-        "$color" "$state_text" "$(gm_ell "$model" 22)" "$(gm_fmt_dur "$elapsed")" "${code:--}" "${TOK:-—}" "${MSGS:-—}" >> "$HEADF"
+      printf '\033[%sm%s\033[0m · %s%s · 用时 %s · exit %s\n' \
+        "$color" "$state_text" "$(gm_ell "$model" 18)" "$agent_txt" "$(gm_fmt_dur "$elapsed")" "${code:--}" >> "$HEADF"
     fi
   else
     if (( active )); then
@@ -154,30 +150,34 @@ render() { # status model card elapsed active sid code
   printf '\033[2m%s\033[0m\n' "$(printf '─%.0s' $(seq 1 "$GM_TERM_COLS"))" >> "$HEADF"
 
   : > "$BODYF"
-  if [[ -n $sid ]]; then
-    render_messages "$sid" | while IFS=$'\t' read -r kind a b c d; do
-      case $kind in
-        U) emit_text "用户" "1;34" "$a" ;;
-        A) emit_text "助手" "1;32" "$a" ;;
-        R) emit_text "思考" "2" "$a" ;;
-        T) emit_tool "$a" "$b" "$c" "$d" ;;
-        I) emit_dim "… 等待（${a:-idle}）" ;;
-        S) emit_dim "$a" ;;
-        C) emit_dim "（上下文压缩）$a" ;;
-        *) : ;;
-      esac
-    done >> "$BODYF"
-  fi
+  flush_r() {
+    [[ -n ${1:-} ]] || return 0
+    printf '\033[2m◈ 思考流（最近）\033[0m\n' >> "$BODYF"
+    printf '%s' "$1" >> "$BODYF"
+    printf '\n' >> "$BODYF"
+  }
+  local rbuf=""
+  { render_messages "$sid"; printf 'X\t\n'; } | while IFS=$'\t' read -r kind a b c d; do
+    if [[ $kind == R ]]; then rbuf="${rbuf}${a}"$'\n'; continue; fi
+    flush_r "$rbuf"; rbuf=""
+    case $kind in
+      U) emit_text "用户" "1;34" "$a" ;;
+      A) emit_text "助手" "1;32" "$a" ;;
+      T) emit_tool "$a" "$b" "$c" "$d" ;;
+      I) emit_dim "… 等待（${a:-idle}）" ;;
+      S) emit_dim "$a" ;;
+      C) emit_dim "（上下文压缩）$a" ;;
+    esac
+  done >> "$BODYF"
 
   : > "$BUF"
   cat "$HEADF" >> "$BUF"
   if [[ -s $BODYF ]]; then
     tail -n "$BODY_LINES" "$BODYF" >> "$BUF"
   else
-    # 会话尚未建立：退回原始日志，避免 pane 空白
     {
       printf '\033[2m  等待 opencode 会话建立…（日志实时预览）\033[0m\n\n'
-      if [[ -f $LOG ]]; then tail -n "$((BODY_LINES - 2))" "$LOG"; fi
+      [[ -f $LOG ]] && tail -n "$((BODY_LINES - 2))" "$LOG"
     } >> "$BUF"
   fi
   printf '\033[2m%s\033[0m\n' "$(printf '─%.0s' $(seq 1 "$GM_TERM_COLS"))" >> "$BUF"
@@ -187,14 +187,13 @@ render() { # status model card elapsed active sid code
     printf '\033[2mrun 已结束，pane 即将关闭 · %s\033[0m' "$(date '+%H:%M:%S')" >> "$BUF"
   fi
 
-  printf '\033[H\033[2J'
-  cat "$BUF"
-  sed $'s/\033\\[[0-9;]*m//g; s/\033\\][^\a]*\a//g' "$BUF" > "$SNAP.tmp.$$" 2>/dev/null \
-    && mv -f "$SNAP.tmp.$$" "$SNAP" 2>/dev/null
+  # 无闪烁重绘：逐行刷新，不清屏
+  printf '\033[H'
+  sed $'s/$/\\x1b[K/' "$BUF"
+  printf '\033[J'
+  sed $'s/\033\\[[0-9;]*m//g; s/\033\\][^\a]*\a//g' "$BUF" > "$SNAP.new.$$" 2>/dev/null \
+    && mv -f "$SNAP.new.$$" "$SNAP" 2>/dev/null
 }
-
-# ---------- 循环 ----------
-pty_alive() { stty size </dev/tty >/dev/null 2>&1; }
 
 while :; do
   if [[ ! -f $REG ]]; then
@@ -204,9 +203,12 @@ while :; do
   fi
 
   IFS=$'\t' read -r status model card logf pid started cwd code <<<"$(
-    jq -r '[.status // "unknown", .model // "-", .card // .id // "-",
-            .log // "-", (.pid // 0 | tostring), (.started // 0 | tostring),
-            .cwd // "", (.exit // 0 | tostring)] | @tsv' "$REG" 2>/dev/null
+    jq -r '[.status // "unknown", .model // "-",
+            ((.card // .id // "-") | if . == "" then "-" else . end),
+            ((.log // "-") | if . == "" then "-" else . end),
+            (.pid // 0 | tostring), (.started // 0 | tostring),
+            ((.cwd // "-") | if . == "" then "-" else . end),
+            (.exit // 0 | tostring)] | @tsv' "$REG" 2>/dev/null
   )"
   LOG=${logf:-}
   started=${started:-0}; pid=${pid:-0}; code=${code:-0}
@@ -215,25 +217,21 @@ while :; do
   (( BODY_LINES < 4 )) && BODY_LINES=4
 
   active=0
-  local sid_db
   sid_db=$(gm_run_get "$REG" .session "" 2>/dev/null)
   if [[ -n $sid_db && "$pid" == 0 ]]; then
     # DB 自动发现模式：会话 150 秒内有更新 = 运行中
-    local fresh
     fresh=$(sqlite3 -readonly "$GM_OPENCODE_DB" "select case when time_updated >= $(( ($(gm_now) - 150) * 1000 )) then 1 else 0 end from session_v2 where id='$sid_db';" 2>/dev/null)
     [[ $fresh == 1 ]] && active=1
   elif [[ $status == running ]] && gm_alive "$pid"; then
     active=1
   fi
 
-  # session id：先看缓存文件，再按 cwd+时间解析
   sid=""
   [[ -s $SIDFILE ]] && sid=$(cat "$SIDFILE" 2>/dev/null)
   if [[ -z $sid ]]; then
     sid=$(gm_session_for_registry "$REG" 2>/dev/null) || sid=""
   fi
 
-  # token / 消息数：每 5 秒刷新一次
   now=$(gm_now)
   if (( now - TOK_AT >= 5 )); then
     TOK_AT=$now
@@ -241,22 +239,31 @@ while :; do
       if t=$(gm_session_tokens_sid "$sid"); then TOK=$(gm_fmt_tokens "$t"); else TOK=""; fi
       esc=${sid//\'/\'\'}
       MSGS=$(sqlite3 -readonly "$GM_OPENCODE_DB" "select count(*) from session_message where session_id='$esc';" 2>/dev/null)
+      # Agent 与标题（卡片名为空时回退到会话标题/首条用户提示词）
+      IFS=$'\t' read -r STITLE AGENT <<<"$(sqlite3 -readonly "$GM_OPENCODE_DB" "select coalesce(title,'-')||char(9)||coalesce(agent,'-') from session_v2 where id='$esc';" 2>/dev/null)"
+      if [[ ${STITLE:-} == "-" ]]; then STITLE=""; fi
+      if [[ ${AGENT:-} == "-" ]]; then AGENT=""; fi
+      if [[ -z ${STITLE:-} ]]; then
+        STITLE=$(sqlite3 -readonly "$GM_OPENCODE_DB" "select replace(replace(replace(coalesce(json_extract(data,'$.text'),''),char(34),''),char(10),' '),char(9),' ') from session_message where session_id='$esc' and type='user' order by seq limit 1;" 2>/dev/null | cut -c1-36)
+      fi
     else
       TOK=""; MSGS=""
     fi
   fi
 
   elapsed=$(( $(gm_now) - started )); (( elapsed < 0 )) && elapsed=0
-  render "$status" "$model" "$card" "$elapsed" "$active" "$sid" "$code"
 
-  # 供验收测试断言（pane 实际尺寸）
-  printf '%s %s\n' "$GM_TERM_COLS" "$GM_TERM_LINES" > "$GM_STATE/size-$ID.txt" 2>/dev/null
+  card_disp=$(gm_cut "${card:-}" 44)
+  [[ -z ${card_disp//[[:space:]]/} ]] && card_disp="${STITLE:-opencode 会话}"
 
-  pty_alive || exit 0                     # pane 已被关闭 → 自杀
   if (( active )); then
     touch "$HB"
+    render "$status" "$model" "$card" "$elapsed" 1 "$sid" "$code"
+    printf '%s %s\n' "$GM_TERM_COLS" "$GM_TERM_LINES" > "$GM_STATE/size-$ID.txt" 2>/dev/null
     sleep 1
   else
+    render "$status" "$model" "$card" "$elapsed" 0 "$sid" "$code"
+    printf '%s %s\n' "$GM_TERM_COLS" "$GM_TERM_LINES" > "$GM_STATE/size-$ID.txt" 2>/dev/null
     rm -f "$HB"
     sleep 0.3
     exit 0

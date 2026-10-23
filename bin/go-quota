@@ -1,12 +1,16 @@
 #!/bin/bash
 # go-quota — 读取 OpenCode Go 套餐用量（缓存 60s）。
 #
-# 数据源（官方接口，API Key 只读调用、不落盘不回显，同 go-status.sh 的方式）：
+# 数据源（官方接口，API Key 只读调用，同 go-status.sh 的方式）：
 #   1) GET https://opencode.ai/zen/go/v1/usage
 #      → {"usage":{"rolling":{"percent","resetsAt"},"weekly":{...},"monthly":{...}}}
 #      rolling = 5 小时窗口（开源插件 oc-usage-limits-plugin 同款接口）
-#   2) GET /console/api/v2/usage/export?range=7d
+#   2) GET /console/api/v2/usage/export?range=30d
 #      → 按天×模型的 requests / 各类 token / cost 明细 CSV
+#
+# 口径（与官方控制台一致）：
+#   今日 = 本地时区当天（昨天的 UTC 日行按时区偏移分摊）
+#   7天  = 近 7 个 UTC 日（今天 + 前 6 天）
 #
 # 输出缓存：
 #   go-quota.txt（TSV）：账号 \t 状态 \t 5h% \t 5h重置 \t 周% \t 周重置 \t 月% \t 月重置
@@ -40,20 +44,25 @@ fetch_csv() { # key range -> stdout CSV
 # 官方 token 用量：今日/7天 tokens 与花费 + 模型用量排名（7天 token 降序，前 8）
 write_usage() { # key
   local csv="$GM_CACHE/go-usage.csv.tmp.$$"
-  fetch_csv "$1" "7d" > "$csv" 2>/dev/null
+  local ZZ SIGN HH OH
+  ZZ=$(date +%z); SIGN=${ZZ:0:1}; HH=${ZZ:1:2}; OH=$((10#$HH)); [[ $SIGN == "-" ]] && OH=0
+  fetch_csv "$1" "30d" > "$csv" 2>/dev/null
   {
-    awk -F, -v t="$(date -u +%F)" -v w="$(date -u -v-Mon +%F 2>/dev/null || date -u -d 'last monday' +%F)" '
+    awk -F, -v t="$(date +%F)" -v y="$(date -v-1d +%F)" -v w7="$(date -v-6d +%F)" -v oh="$OH" '
       NR > 1 && $1 != "" {
         tk = $8 + $9 + $10 + $11 + $12; c = $13 + 0
+        if ($1 == y) { yt += tk; yc += c }
         if ($1 == t) { tt += tk; tc += c }
-        if ($1 >= w) { wt += tk; wc += c }
-      } END { printf "%d\t%d\t%d\t%d\n", tt + 0, tc + 0, wt + 0, wc + 0 }' "$csv"
-    awk -F, -v w="$(date -u -v-Mon +%F 2>/dev/null || date -u -d 'last monday' +%F)" '
-      NR > 1 && $1 != "" && $1 >= w && $6 != "" {
+        if ($1 >= w7) { wt += tk; wc += c }
+      } END {
+        lt = int(yt * oh / 24) + tt; lc = int(yc * oh / 24) + tc
+        printf "%d\t%d\t%d\t%d\n", lt + 0, lc + 0, wt + 0, wc + 0
+      }' "$csv"
+    awk -F, -v w7="$(date -v-6d +%F)" '
+      NR > 1 && $1 != "" && $1 >= w7 && $6 != "" {
         m[$6] += $8 + $9 + $10 + $11 + $12
       } END { for (k in m) printf "%s\t%d\n", k, m[k] }' "$csv" \
-      | sort -t"$(printf '\t')" -k2,2rn | head -8 \
-      | while IFS="$(printf '\t')" read -r m tk; do printf '%s\t%d\n' "$m" "${tk:-0}"; done
+      | sort -t"$(printf '\t')" -k2,2rn | head -8
   } > "$USAGE.tmp.$$" 2>/dev/null
   mv -f "$USAGE.tmp.$$" "$USAGE"
   rm -f "$csv"

@@ -24,7 +24,7 @@ render() {
   gm_term_size
   local mid=$((GM_TERM_LINES / 2))
   printf '%s %s\n' "$GM_TERM_COLS" "$GM_TERM_LINES" > "$GM_STATE/size-slot-$IDX.txt" 2>/dev/null
-  printf '\033[H\033[2J'
+  printf '\033[H'
   local i
   for ((i = 0; i < mid - 2; i++)); do printf '\n'; done
   printf '\033[2m              ◇\033[0m\n\n'

@@ -385,8 +385,10 @@ reconcile() {
   read_dash
 
   # 1) 监控窗口校验
+  # 用量 pane 心跳：size-usage.txt 超 8 秒没更新 = 进程挂了 → 重建
+  local uage=$(( $(gm_now) - $(gm_mtime "$GM_STATE/size-usage.txt") ))
   if [[ -z $DWID ]] || ! is_live_window "$DWID" || ! is_live_term "$DTERM" \
-     || [[ $(term_window "$DTERM") != "$DWID" ]]; then
+     || [[ $(term_window "$DTERM") != "$DWID" ]] || (( uage > 8 )); then
     if [[ -n $DWID ]] && is_live_window "$DWID"; then
       log "用量 pane 丢失，重建监控窗口（旧 window=${DWID}）"
       close_grid
@@ -416,8 +418,8 @@ reconcile() {
   if [[ ${GM_DB_DISCOVER:-1} == 0 ]]; then return 0; fi
   local cutoff_ms=$(( (nowv - 600) * 1000 ))
   local bound; bound=" $(cat "$GM_STATE"/session-* 2>/dev/null | tr '\n' ' ') "
-  local sid dir title model created updated s8 rf
-  while IFS=$'\t' read -r sid dir title model created updated; do
+  local sid dir title model created updated sended s8 rf
+  while IFS=$'\t' read -r sid dir title model created updated sended; do
     { echo "DBG sid=[$sid] dir=[$dir] model=[$model] created=[$created] updated=[$updated]"; } >> /tmp/dbloop.log
     [[ -n $sid ]] || continue
     case "$bound" in *" $sid "*) continue ;; esac
@@ -431,9 +433,9 @@ reconcile() {
       printf '%s' "$sid" > "$GM_STATE/session-$s8"
       log "DB 发现 opencode 会话（${dir}）→ 登记 ${s8}"
     fi
-    if (( updated < (nowv - 120) * 1000 )); then
+    if (( sended == 1 )) || (( updated < (nowv - 120) * 1000 )); then
       if [[ $(gm_run_get "$rf" .status "") == running ]]; then
-        jq '.status="done"' "$rf" > "$rf.t" && mv -f "$rf.t" "$rf"
+        jq '.status="done" | .finished = (now | todateiso8601 | sub("T";" ") | .[0:19])' "$rf" > "$rf.t" && mv -f "$rf.t" "$rf"
         log "DB 会话 ${s8} 已结束"
       fi
       continue
@@ -450,7 +452,7 @@ reconcile() {
     [[ -n $dsid ]] || continue
     local exists
     exists=$(sqlite3 -readonly "$GM_OPENCODE_DB" "select 1 from session_v2 where id='$dsid';" 2>/dev/null)
-    [[ $exists == 1 ]] || { jq '.status="done"' "$rf" > "$rf.t" && mv -f "$rf.t" "$rf"; log "DB 会话 $dsid 已被移除，标记 ${dsid:0:12} 完成"; }
+    [[ $exists == 1 ]] || { jq '.status="done" | .finished = (now | todateiso8601 | sub("T";" ") | .[0:19])' "$rf" > "$rf.t" && mv -f "$rf.t" "$rf"; log "DB 会话 $dsid 已被移除，标记 ${dsid:0:12} 完成"; }
   done
 
   local sig=""

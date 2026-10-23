@@ -41,6 +41,8 @@ export GM_MAX_RUNS=${GM_MAX_RUNS:-7}
 (( GM_MAX_RUNS < 1 )) && GM_MAX_RUNS=1
 export GM_POLL=${GM_POLL:-2}
 export GM_GOSTATUS_TTL=${GM_GOSTATUS_TTL:-60}
+# 额度三窗口（5h/周/月）是滚动实时值，缓存 20s 保持与官方页面接近一致
+export GM_QUOTA_TTL=${GM_QUOTA_TTL:-20}
 
 mkdir -p "$GM_RUNS" "$GM_STATE/hb" "$GM_LOGS" "$GM_CACHE"
 
@@ -125,8 +127,10 @@ gm_active_runs() {
 gm_db_sessions() {
   local cutoff=${1:-0}
   sqlite3 -readonly "$GM_OPENCODE_DB" \
-    "select id||char(9)||directory||char(9)||coalesce(title,char(32))||char(9)||coalesce(json_extract(model,'\$.id'),char(32))||char(9)||time_created||char(9)||time_updated
-       from session_v2
+    "select id||char(9)||directory||char(9)||coalesce(title,char(32))||char(9)||coalesce(json_extract(model,'\$.id'),char(32))||char(9)||time_created||char(9)||time_updated||char(9)||
+          (case when exists(select 1 from session_message m where m.session_id=s.id and m.type='idle'
+               and m.seq >= coalesce((select max(seq) from session_message m2 where m2.session_id=s.id),0)) then 1 else 0 end)
+       from session_v2 s
       where parent_id is null and time_updated >= $cutoff
       order by time_created asc;" 2>/dev/null
 }

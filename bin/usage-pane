@@ -32,7 +32,7 @@ PLAN_NAME=${GM_PLAN:-go}
 refresh_go_quota() {
   local now age
   now=$(gm_now); age=$((now - $(gm_mtime "$GOQUOTA_CACHE")))
-  (( age < GM_GOSTATUS_TTL )) && return
+  (( age < GM_QUOTA_TTL )) && return
   if [[ -f $GOQUOTA_LOCK ]]; then
     if (( now - $(gm_mtime "$GOQUOTA_LOCK") > 120 )); then rm -f "$GOQUOTA_LOCK"; else return; fi
   fi
@@ -131,6 +131,8 @@ run_tokens_cached() { # reg_file -> token 数；无会话返回 1
 
 quota_rows() { [[ -f $GOQUOTA_CACHE ]] && cat "$GOQUOTA_CACHE" || true; }
 
+gm_get_duration() { jq -r '.duration // 0' "$1" 2>/dev/null; }
+
 fmt_reset() { # iso kind
   local iso=$1 kind=$2
   [[ -z $iso || $iso == "-" ]] && { printf '—'; return; }
@@ -170,6 +172,32 @@ col_runs() { # colw out_file
   done
   (( active == 0 )) && printf '（空闲）gm run --id … -- <命令>\n' >> "$out"
   printf 'gm run / oc-run 登记任务自动上屏\n' >> "$out"
+
+  # 最近完成：用历史任务填满版面（活跃任务多时自动少显示）
+  local room=$(( ${#files[@]} < 3 ? 8 : 6 ))
+  local lines
+  lines=$(for rf in "$GM_RUNS"/*.json; do
+    [[ -f $rf ]] || continue
+    st=$(gm_run_get "$rf" .status "")
+    [[ $st == running ]] && continue
+    fin=$(gm_run_get "$rf" .finished "")
+    [[ -n $fin ]] || continue
+    printf '%s\t%s\n' "$fin" "$rf"
+  done | sort -r | head -n "$room")
+  if [[ -n $lines ]]; then
+    printf '\n◆ 最近完成\n' >> "$out"
+    while IFS=$'\t' read -r fin rf; do
+      [[ -f $rf ]] || continue
+      rid=$(gm_run_get "$rf" .id "-")
+      rmodel=$(gm_cut "$(gm_run_get "$rf" .model "-")" 16)
+      rst=$(gm_run_get "$rf" .status "-")
+      rdur=$(gm_get_duration "$rf")
+      mark="·"
+      [[ $rst == done ]] && mark="✓"
+      [[ $rst == failed ]] && mark="✗"
+      printf '%s %s %s %s %s\n' "${fin:11:5}" "$mark" "$(gm_ell "$rid" 14)" "$rmodel" "$rdur" >> "$out"
+    done <<< "$lines"
+  fi
 }
 
 col_usage() { # colw out_file
@@ -339,7 +367,7 @@ PY
   if (( W < 52 )); then
     printf '\033[2m2s刷新 · gm stop 停止\033[0m' >> "$buf"
   else
-    printf '\033[2m2s刷新 · 额度/用量缓存 %ss · gm stop 停止\033[0m' "$GM_GOSTATUS_TTL" >> "$buf"
+    printf '\033[2m2s刷新 · 额度%s/用量%ss · gm stop 停止\033[0m' "$GM_QUOTA_TTL" "$GM_GOSTATUS_TTL" >> "$buf"
   fi
 
   # ---- 着色（在拼好宽度的纯文本上） ----
@@ -350,8 +378,9 @@ PY
     s/^◈/\e[1;36m◈/;
   ' "$buf" > "$buf.c.$$" 2>/dev/null && mv -f "$buf.c.$$" "$buf"
 
-  printf '\033[H\033[2J'
-  cat "$buf"
+  printf '\033[H'
+  sed $'s/$/\x1b[K/' "$buf"
+  printf '\033[J'
   sed $'s/\033\\[[0-9;]*m//g; s/\033\\][^\a]*\a//g' "$buf" > "$SNAPSHOT.new.$$" 2>/dev/null \
     && mv -f "$SNAPSHOT.new.$$" "$SNAPSHOT" 2>/dev/null
   printf '%s %s\n' "$GM_TERM_COLS" "$GM_TERM_LINES" > "$GM_STATE/size-usage.txt" 2>/dev/null
