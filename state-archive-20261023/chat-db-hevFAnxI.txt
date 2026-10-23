@@ -1,0 +1,41 @@
+▌执行 UX-ASSET.md 卡片任务 db-hevFAnxI
+● 运行中 · deepseek-v4.1-flash-f… · 2m57s · tok 54.8k · 消息 31
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 | `mobile/assets/brand/textures/share-dark.png` | 1024×1024 / 4,582 B | 脚本产物，入库 |
+
+▌助手 | `mobile/src/theme/tokens.ts` | 310→341（+31） | 仅追加 `shareTexture` 底纹色 token（亮/暗各 5 键）+ FW10 接入就绪注释（含 import 路径/cover 裁切/显式 theme） |
+
+▌助手 | `runs/audit/rejected-assets/ux-share-{light,dark}.png` | 54,374 / 205,300 B | 废稿留档（`runs/` 已 gitignore，不入库） |
+
+▌助手 ## ② 自验命令与逐条结果
+
+▌助手 ```bash
+
+▌助手 node mobile/scripts/assets/gen-share-textures.mjs && echo GEN_OK      # GEN_OK；两次执行 sha256 完全一致
+
+▌助手 cd mobile && npx tsc --noEmit && npm run lint                         # tsc exit=0；lint exit=0（仅 1 条既有无关告警 app/report.tsx:18 PAYWALL_VIEWED_KEY 未使用，非本卡引入）
+
+▌助手 python3 -c "from PIL import Image" … / node PNG sig                  # PIL 可用；另测 sig=89504e470d0a1a0a 合法
+
+▌助手 npm run test:unit                                                     # 283 例：pass 282 / fail 0 / skipped 1
+
+▌助手 ```
+
+▌助手 - **幂等**：`share-light` `f5c08c3f…8d40`、`share-dark` `69ec4276…c729`，重复执行前后一致。
+
+▌助手 - **规格逐像素抽检**（解 IDAT 直读 RGB，x=0/512/1023 三点同值，确认无混色）：亮 y0–221 `#E6D8F5` / 222–443 `#BFE8E6` / 444–665 `#F8D9BE` / 666–667 `#2A2A32`（2px 硬线）/ 668–1023 `#F6EFE2`；暗同结构 `#1C1C22`/`#211E28`/`#1D2225`/`#3A3A42`/`#121214`（暗带最大亮度 13.3% ≤18%）。
+
+▌助手 - **体积**：4.5 KB/张，远低于 200KB 上限。
+
+▌助手 ## 卡尾说明（两处按仓库实况二选一/偏差如实上报）
+
+▌助手 1. **接入走"只产图 + 留注释"分支**：`mobile/src/components/share/ShareCardCanvas.tsx` 在 `ticket/M1-04b` 与 `main` 均不存在，属 UX-H（方案 §9 卡 8）新文件 → 未抢建，接入说明已写进 `tokens.ts` 的 `shareTexture` 注释（import 路径、`ImageBackground`+`cover`、theme 显式传参），归 FW10/UX-H 卡接线。
+
+▌助手 2. **废稿 PNG 不在本工作树**：`ux-share-*.png` 仅存在于主仓根 `assets/brand/textures/`（不在 `wt-func` 的 `mobile/assets/brand/textures/`），且主仓不在本卡工作目录范围。已做**不动原件的留档复制**到 `runs/audit/rejected-assets/`（证据未删）；物理"移出 textures"建议随
+  合入/清理卡在主仓执行一次，避免跨工作树改动。
+
+▌助手 3. `mobile/src/theme/tokens.ts` 341 行已超 300 行软上限（改前 310 已超）：建议后续拆 `palette.ts`（色板）+ `metrics.ts`（字阶/间距/动效），本卡不顺手重构。
+
+  … 等待（succeeded）
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:16:13 · ses hevFAnxI

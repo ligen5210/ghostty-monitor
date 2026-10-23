@@ -1,0 +1,37 @@
+ 执行 IA-1 任务卡片并输出 DONE  db-3I4xtvOX 
+● 运行中 · deepseek-v4.1-flash · 4m56s · tok 81.2k · 消息 39
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+◈ 思考流（最近）
+Interesting — that assertion passed. Let's see how m02 checks it, maybe it uses table values from the doc itself and compares to table, or maybe it rea
+
+⚙ shell [completed] cd "/Volumes/移动硬盘/dev/wt-func/mobile" && sed -n '880,935p' scripts/grade/m02.mjs
+  ⎿     const en = extractTranslationBucket('EN_TRANSLATION'); ⏎     const zh = extractTranslationBucket('ZH_HANS_TRANSLATION'); ⏎     const missingInT
+
+◈ 思考流（最近）
+ 
+Also let me double check the final file lines around edits for formatting consistency and line lengths. Also check index.ts EN headline: still wrapped 
+ 
+One more thing: the ticket's allowed files list matches exactly the 3 files changed. Good.
+ 
+Also should verify `npm run test:unit` maybe equals node --test set; node --test ran 417 tests including all src tests. Fine.
+ 
+Also check that no other files changed (we used write only on 3 i18n files). Let me check mtimes / use `git status`? That's a git read op. Since user s
+
+⚙ shell [completed] cd "/Volumes/移动硬盘/dev/wt-func" && find . -path ./node_modules -prune -o -newer /private/var/folders/r3/mvb6vctj69q3jt4g5h4sk5q4
+  ⎿ ./mobile/src/shared/i18n/locales-ext-a.ts ⏎ ./mobile/src/shared/i18n/locales-ext-b.ts ⏎ ./mobile/src/shared/i18n/index.ts ⏎ ./runs/queue-ia123/logs
+
+◈ 思考流（最近）
+ 
+Actually values: index.ts: 2 (en,zh) headline + cta = 2 keys × 2 locales = 4 values; ext-a: 2×4=8; ext-b: 2×6=12. Total 24 values. Comments: 12 (one pe
+ 
+Kill the temp scripts? They're in temp dir; fine to leave, but mention scripts not in repo. Clean up backups? Keep backup harmless in temp. I'll leave.
+ 
+One more: the ticket says "值内禁词零命中" — verified.
+ 
+Also should I mention that docs/copy/M01-M02-文案key表.md still holds old values/max_chars (100/12) for these 2 keys and is outside whitelist → grade A
+
+⚙ shell [completed] grep -n "AC-M02-04-S2\|CONSENT_CONTRACT_KEYS =" -A3 /tmp/ia1-m02.log | head -10; cd "/Volumes/移动硬盘/dev/wt-func/mobile" && grep 
+  ⎿ 17:PASS AC-M02-04-S2 文案桶值 == 文案 key 表定稿值（en+zh 逐字一致，9 key × 2 语言） ⏎ 18-PASS AC-M02-04-S6 文案长度 ≤ key 表 max_chars 预算（en+zh
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 23:07:46 · ses 3I4xtvOX

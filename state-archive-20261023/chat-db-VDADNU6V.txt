@@ -1,0 +1,37 @@
+ 执行 QA3.md 工单任务（禁 git）  db-VDADNU6V 
+● 运行中 · deepseek-v4.1-flash · 9m58s · tok 170.8k · 消息 71
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 3. supportsImage=false 且有图 → 仍纯文本（capability 优先）
+
+▌助手 4. 能力表：默认 true / `IMAGE_INPUT_DISABLED=1` 全量降级 / mock 恒 true / 纯文本模型名 false
+
+▌助手 5. 适配器原样携带多模态 content（不丢 image part）
+
+▌助手 6. 上游 500 错误信息不含 base64（日志/错误出口红线）
+
+▌助手 7. mock provider 对 image part 消息完全兼容
+
+▌助手 8. generate 侧带图 → 请求含 image part 且 prompt 用「attached photo」措辞
+
+▌助手 9. generate 侧无图 → 纯问卷变体、无图
+
+▌助手 10. generate 侧 `IMAGE_INPUT_DISABLED=1` → 纯问卷变体、无图
+
+▌助手 11. handler 照片 b64 下传；缺 b64 → `photo:null`
+
+▌助手 12. handler 日志字段序列化无 base64 / 无 data URL
+
+▌助手 13. report 侧带图 → 请求含 image part 且 prompt 用「attached photo」措辞
+
+▌助手 14. report 侧 `IMAGE_INPUT_DISABLED=1` → 纯问卷变体、无图
+
+▌助手 卡尾自验结果**未写入** `tickets/QA3.md`（该文件在主仓工作区、不在本次工作目录，按"只改允许文件 + 禁 git"纪律不越界写入），
+
+▌助手 风险提示：`supportsImage` 能力真源目前是静态口径（DeepSeek/Mistral 按 OpenAI 兼容多模态同族，默认 true），实测某模型不支持
+  模型表化留后续卡。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 19:42:28 · ses VDADNU6V

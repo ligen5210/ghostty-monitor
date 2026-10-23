@@ -1,0 +1,37 @@
+ 执行QA6卡片：mobile tsc与lint检查  db-FB5GAfJO 
+● 运行中 · mimo-v2.6-flash · 2m52s · tok 36.8k · 消息 14
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 - supabase/functions/_shared/limit.ts、limit.test.ts
+
+▌助手 - supabase/functions/typara-report/handler.ts、handler.test.ts
+
+▌助手 - supabase/migrations/20261023190000_m1_generations_report_issued_at.sql（新文件）
+
+▌助手 ## 自验命令与逐条结果（全部已验证）
+
+▌助手 ```
+
+▌助手 cd mobile && npx tsc --noEmit          → 0 错误
+
+▌助手 npm run lint                            → 0 报错
+
+▌助手 node --test (mobile *.test.ts)          → 387 tests / 386 pass / 0 fail / 1 skipped
+
+▌助手 tsc -p supabase/functions/tsconfig...   → 0 错误
+
+▌助手 node --test (functions *.test.ts)       → 237 tests / 237 pass / 0 fail
+
+▌助手 grep -c install-demo-0001 share-preview → 0（REAL_ID）
+
+▌助手 grep success limit.ts                   → props->>status='eq.success' 命中
+
+▌助手 ```
+
+▌助手 **基线：双侧 fail 0 ✓**；新增测试 10 个文件含 QA6 专测（quality/upload/limit/report-handler/share-id/consent-gate/l0/report
+  程无 git 操作。卡尾注：真像素解码（GrayFrame）依赖原生件审批，`FrameDecoder` 注入点已留。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 20:08:23 · ses FB5GAfJO

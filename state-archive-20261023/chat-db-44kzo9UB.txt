@@ -1,0 +1,40 @@
+▌执行 FW-8.md 卡片任务并输出 DONE db-44kzo9UB
+● 运行中 · deepseek-v4.1-flash-f… · 2m35s · tok 58.2k · 消息 28
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 ## ② 自验命令与逐条结果
+
+▌助手 ```bash
+
+▌助手 cd mobile && npx tsc --noEmit && npm run lint
+
+▌助手 ```
+
+▌助手 - `tsc --noEmit`：**通过，无输出（0 error）**
+
+▌助手 - `eslint .`：**通过，0 warning/0 error**
+
+▌助手 ```bash
+
+▌助手 node --experimental-strip-types --test --disable-warning=ExperimentalWarning $(find src -name '*.test.ts' | sort)
+
+▌助手 ```
+
+▌助手 - 全量：**346 tests / 344 pass / 1 fail / 1 skipped**
+
+▌助手 - 新增 4 条（单独跑全绿）：
+
+▌助手   - `FW-8：TOC 覆盖 15 模块 slug（与 MODULE_IDS 同源，禁硬编码子集）`
+
+▌助手   - `FW-8：onLayout 收集模块偏移表（内存 Map，key=moduleSlug）`
+
+▌助手   - `FW-8：TOC 行 onPress 触发滚动（scrollToOffset(offsetFor(slug))）`
+
+▌助手   - `FW-8：不加 /report/[moduleSlug] 子路由（锚点滚动已覆盖，深链统一卡）`
+
+▌助手 **唯一红=既有失败，非本卡引入**：`src/shared/i18n/index.test.ts:295 [FW-15] es 仍缺键` — 缺 `generating.priming.title/body/cta` 三条，`report.ts` 仅 en/zh-Hans 有该键，8 个扩展语桶未补。属 FW-15（i18n 补键）范围，不在本卡允许改的文件内，未动。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:47:48 · ses 44kzo9UB

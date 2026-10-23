@@ -1,0 +1,40 @@
+▌执行 BE-2 任务卡片 db-PPsxxm1k
+已完成 · mimo-v2.6-flash · 用时 41m52s · exit 0
+───────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手   report 侧 account_token+模块清单+score 落库））
+
+▌助手 规范检查（本卡 5 文件）：require()/module.exports/: any/as any/console 零命中
+
+▌助手 ```
+
+▌助手 ## ③ 卡尾注（需 QA/总经理知悉）
+
+▌助手 1. **405/400/401 的 code 口径**：§2 未注册这三个 HTTP 状态的码，按卡片「错误体形状照 §1」执行——405/400 用封闭枚举 `INTERNAL`，**401 用 `CONSENT_MISSING`**（jwt.ts 自述的兜底码）；状态
+  码与 `ERROR_HTTP` 码表的偏差即本条，待 QA 追认。
+
+▌助手 2. **CORS/OPTIONS 未实现**：唯一客户端是原生 RN（无同源策略、不发预检），OPTIONS 被 405 兜住；Supabase 平台**不**代插 CORS 头（其文档口径：浏览器调
+  用须函数内自行加 `Access-Control-*`），Web 端接入另开工单。
+
+▌助手 3. **edge 国家头候选** `x-edge-country` → `cf-ipcountry` → `x-nf-country`（权威头名待 W0 伪造实验定稿；全不命中=国家缺失 → lane 第④条 fail-closed 落 eu）。Client IP 取 `x-forwarded-for` 首段、`x-real-ip` 兜底。
+
+▌助手 4. **车道真信号**：`installs.dns_opt_out/storefront_verified` 由 index 读库喂入（deps.ts「index.ts 负责把真实信号喂进来」）；读失败 → INTERNAL 500 不猜（同 config.ts 口径）；行缺失按 false 走（国家/IP 两
+  路仍 fail-closed）。
+
+▌助手 5. **并发工单协同**（本批 BE-9/BE-10 同时在 `wt-func` 作业，已复核合并）：BE-10 给 handler 加了必填 `consent` 与 ⓪ `checkConsent` → 我的 index 保留「缺失即 403」入口闸并把 consent **原样透传**
+  （64:64 hex 形状闸归 handler，不在入口复制）；BE-9 落地 `_shared/limit.ts countTodayCalls` → 我已把 `countTodayCalls` 接线替换掉原 0 桩（generate 取 `_shared/limit.ts`、report 取 `deps.ts`，按其卡约定）。
+
+▌助手 6. **已知开口（非本卡能改，禁改 deps/handler）**：① `findActive` 只回一行无 tier 入参 → 多 active 行按「包含集最宽、同宽取最新」取行，`L1_BUNDLE` 与 `L3_GLOWUP` 并存时另
+  一档会 402；② `GenerationsRepo` 接口不带 lane/provider/tokens/score → 落行的 lane 由 index 用同组信号跑一次纯函数（与 handler 判定恒等），L0 的 score 与 provider/tokens 仍无处可写；③ `model.lane_override='mistral_all'` 桥接已接（PRD §11.7②），
+  但模型 ID 仍只有 env 覆盖、`app_config` 侧无键常量可读。
+
+▌助手 7. **300 行软上限**：两份 index 357/386 行超限——本卡允许清单只给了 `index.ts`（禁新建共享文件），传输层助手两文件各一份；建议后续卡
+  放行把 `jsonResponse/transportError/readJsonBody/头读取/base64 折算` 抽到 `_shared/http.ts`（约可各省 80~100 行）。
+
+▌助手 8. `tsconfig.typecheck.json` 中 `typara-session/**` 一行系并行 BE-3 卡所加，非本卡改动。
+
+▌助手 **DONE**
+
+  … 等待（succeeded）
+───────────────────────────────────────────────────────────────────────────────────────────────
+run 已结束，pane 即将关闭 · 18:05:14

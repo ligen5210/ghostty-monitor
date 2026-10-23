@@ -1,0 +1,37 @@
+ S26-EVTSQL consent_pending 迁移复审  db-cTTRC3w6 
+● 运行中 · deepseek-v4.1-flash · code-reviewer · 3m03s · tok 53.0k · 消息 19
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 | ② 幂等可重放 | PASS | `drop constraint if exists` → `add constraint`；约束名为 PG 自动名 `ev
+  必过；Supabase migrate 单文件单事务，drop/add 原子 |
+
+▌助手 | ③ 不改历史迁移/函数/RLS | PASS | `git diff main...HEAD --name-status` = 仅 `A 20261023230000
+
+▌助手 | ④ 分区递归语义 | PASS | PG 官方 ALTER TABLE："Adding a constraint recurses only for CHECK co
+  口径正确 |
+
+▌助手 | AC 判分命令 | PASS（本审独立重跑） | `tsc --noEmit` 退出 0；`node --test supabase/functions/
+
+▌助手 ### 问题清单
+
+▌助手 | 位置 | 问题 | 严重度 | 修复建议 |
+
+▌助手 |---|---|---|---|
+
+▌助手 | 全文件 | 无库可实测：本机无 psql/docker/initdb，②④ 为文档推演非实跑；上线首跑若约束名意外不
+  默只 `drop … if exists` 而不生效 | 观察（P3，部署期兜底） | 部署时把本迁移连跑两次并 `select conna
+
+▌助手 | 分支 `ticket/M1-04b` | 工单头要求分支 `ticket/s26-evtsql`，实际为 runner 代收在既有分支提交
+  台账，不阻塞合并） | 沿 S26-SRV 先例记台账；是否必须按卡片建分支请总经理拍板，本审不代决 |
+
+▌助手 | `mobile/src/shared/events/upload.ts:44-45` | 注释仍写"consent_pending 尚未进 DB check 约束"
+  ，非本卡白名单） | 另开微卡或 S26 收尾统一清注释；本卡不得改该文件（遵守白名单） |
+
+▌助手 | 交付说明 | 自述"54 行"，实际 48 行（diff 48 insertions） | 观察（报告笔误） | 无需返工，仅台
+
+▌助手 补充确认（非阻断）：`consent_pending` 服务端无第二处名单需同步（`supabase/functions` 仅 `_shar
+  ；`props={}` 与 `events_props_no_pii` 约束不冲突。
+
+  … 等待（succeeded）
+────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 22:57:05 · ses cTTRC3w6

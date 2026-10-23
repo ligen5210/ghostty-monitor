@@ -1,0 +1,37 @@
+ 执行 IA-3 工单任务（移动端校验）  db-hoECzXao 
+● 运行中 · deepseek-v4.1-flash · 3m03s · tok 55.1k · 消息 32
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+⚙ shell [completed] rm -f /var/folders/r3/mvb6vctj69q3jt4g5h4sk5q40000gn/T/opencode/ia3-verify.mjs; cd /Volumes/移动硬盘/dev/wt-func/mobile/src/shared/
+  ⎿      329 index.ts ⏎      924 locales-ext-a.ts ⏎     1406 locales-ext-b.ts ⏎     2659 total ⏎ 
+
+▌助手 **① 改动文件清单**
+
+▌助手 | 文件 | 变更 |
+
+▌助手 |---|---|
+
+▌助手 | `mobile/src/shared/i18n/index.ts` | +10 行（319→329）：en 桶 + zh-Hans 桶各新增 `onboarding.value.privacy.title`、`quiz.intro.expectation`（含 
+
+▌助手 | `mobile/src/shared/i18n/locales-ext-a.ts` | +20 行（904→924）：es / ja / pt-BR / de 四桶各加 2 key |
+
+▌助手 | `mobile/src/shared/i18n/locales-ext-b.ts` | +30 行（1376→1406）：fr / it / ko / id / hi / sv 六桶各加 2 key |
+
+▌助手 12 桶键集一致（各 +2），只增不改，无既有值变更。
+
+▌助手 **② 自验命令与结果**
+
+▌助手 1. `cd mobile && npx tsc --noEmit` → 通过（无输出）
+
+▌助手 2. `npm run lint`（eslint .）→ 通过（无告警）
+
+▌助手 3. `node --test` → `# tests 417 / pass 416 / fail 0 / skipped 1`，全绿
+
+▌助手 4. 追加逐字核对（临时脚本，已删除）：解析文案表第 8~9 行 12 列 × 2 key = **24 条字符串与 12 桶落值逐字一致 → ALL 24 STRINGS VERBATIM OK**；两条 k
+
+▌助手 **说明**：卡片“commit 到 ticket/ia-3”一项未执行——本次指令明确「禁止 git 操作」，故按调用方指令跳过（工作区改动已就位，可回退：仅新增行，revert 上
+
+▌助手 DONE
+
+  … 等待（succeeded）
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 23:15:07 · ses hoECzXao

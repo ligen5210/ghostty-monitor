@@ -1,0 +1,37 @@
+ 执行 S26-CLIENT 任务卡片  db-hTlwBfw6 
+● 运行中 · deepseek-v4.1-flash · 5m19s · tok 78.7k · 消息 33
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 | `mobile/src/shared/analytics/events.test.ts` | 359 | 新增 `[S26]` 用例：白名单恰空集 + 任何键被剥离（+19 行） |
+
+▌助手 未触碰：`consent-sheet-state` / `consent-log` / `version-source` / `consent-advance` 生产逻辑、i18n 文件、generation store；`consent.version.pend
+
+▌助手 ## ② 自验命令与逐条结果
+
+▌助手 1. `cd mobile && npx tsc --noEmit` → **TSC_EXIT=0**
+
+▌助手 2. `cd mobile && node --test` → **417 tests / 416 pass / 0 fail / 1 skipped**（基线 416 → 新增 1 条；consent 三例改口径后仍 3 例全过）
+
+▌助手 3. 附加 `npx eslint <5 个改动文件>` → **exit 0**（零告警）
+
+▌助手 4. 附加 `npm run verify:m01` → PASS 14 / FAIL 0
+
+▌助手 人工核对（QA 复审项）：
+
+▌助手 - `handleConfirm` 已无占位早退分支；仅剩 `next === null`（未勾选/重复确认）守卫；
+
+▌助手 - pending 路径唯一写库动作是 `enqueueEvent(... 'consent_pending' ...)`，`enqueueConsentLog` 只在 `else`（真哈希）分支。
+
+▌助手 ## 需上报的两条风险（不在本卡白名单，未擅自改）
+
+▌助手 1. **P0 · DB 约束缺 `consent_pending`**：`supabase/migrations/20261022141400_m0_typara_tables.sql:143` 的 `event_name check` 仍是 14 个枚举名。按
+  在 `upload.ts` 原位留注释标记。
+
+▌助手 2. **既有 FAIL（非本卡引入）**：`npm run verify:m02` 报 `AC-M02-12-U1` FAIL —— 判分器用 `indexOf('if (!quality.ok)')` 定位拦截分支，实际源码为 `i
+  。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 22:49:32 · ses hTlwBfw6

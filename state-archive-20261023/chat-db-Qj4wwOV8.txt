@@ -1,0 +1,40 @@
+▌执行 MERGE-UX.md 合并冲突修复任务 db-Qj4wwOV8
+● 运行中 · deepseek-v4.1-flash · 6m08s · tok 145.2k · 消息 48
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 **① 改动文件清单**
+
+▌助手 | 路径 | 行数 | 解决口径 |
+
+▌助手 | --- | --- | --- |
+
+▌助手 | `mobile/app/generating.tsx` | 455 | 视觉外壳取 M1-01b（UX-E：SpectrumRing/轮播/FailStateCard/DisclaimerPill）；FW-7 全保留：priming 20s 分支 + `generating-priming(-cta)` + `ensureNotificationPermission` 唯一索权点 + `scheduleGenerationDone`/`settleGeneration` 终态撤排程；状态机零改动 |
+
+▌助手 | `mobile/app/l0.tsx` | 207 | 视觉外壳取 UX-F（Logo lockup/头卡/Glance/two 档付费墙）；`share-entry-l0`（曝光闸）+ 齿轮同排（新增 `headerActions` 行） |
+
+▌助手 | `mobile/app/photo-intro.tsx` | 371 | 仅 import 冲突：`Icon` + `PhotoQualityTip` 双保留（质检拦截/reselect 未动） |
+
+▌助手 | `mobile/app/report.tsx` | 260 | 视觉外壳取 UX-G（ReportHeader/ReportToc）；`share-entry-report` + 齿轮（由 ReportHeader 提供）+ `paywall_viewed(report_upsell)` + `report_module_opened` + guard-state 权益注入全保留 |
+
+▌助手 | `mobile/app/share-preview.tsx` | 275 | 视觉外壳取 UX-H（Segmented 三组 + Card + Button）；FW-10 真链路全保留（曝光闸/`exportCardPng` null 降级/`Share.share`/双埋点） |
+
+▌助手 | `mobile/src/components/share/ShareCardCanvas.tsx` | 352 | add/add 纯取 M1-01b 美术版；FW-10 导出走 `features/share/export.ts`，本组件只需确定性渲染（显式 theme + 全 Text `allowFontScaling={false}`） |
+
+▌助手 | `tickets/MERGE-UX.md` | +自验段 | 按卡要求"结果贴卡尾"追加自验记录 |
+
+▌助手 **② 自验命令与逐条结果**
+
+▌助手 1. `grep -c "<<<<<<<\|>>>>>>>" <6 文件>` → **六文件全 0**（原 22 处冲突/44 标记；另全仓扫 `^<<<<<<<|^=======$|^>>>>>>>` 零残留）
+
+▌助手 2. `cd mobile && npx tsc --noEmit` → **exit 0，零输出**
+
+▌助手 3. `node --experimental-strip-types --test ... $(find src -name '*.test.ts')` → **351 tests / pass 349 / fail 1 / skipped 1**；唯一红 = `[FW-15] 10 语键集与 en 源 strict diff=0`（缺 `generating.priming.title/body/cta` 等 16 键）→ 即卡声明的已知 priming 键缺 10 语问题，**符合放行条件**
+
+▌助手 4. 追加 `npx eslint <6 文件>` → **0 error / 0 warning**
+
+▌助手 **一项需说明的差异（非功能回退）**：`share-preview` 的 UX-H 第二按钮（copy-link）未保留——main 侧无此功能、仓库无剪贴板依赖，保留即为空 onPress 假按钮（违反"禁假成功"）；短链已随 `buildShareMessage` 进系统分享文案。如需独立复制按钮，请另开卡引依赖。全程未执行任何 git 命
+  令。
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:56:14 · ses Qj4wwOV8

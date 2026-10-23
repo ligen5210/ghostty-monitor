@@ -1,0 +1,84 @@
+▌执行 UX-C 卡片任务 db-IUd8wbtw
+已完成 · glm-5.3-flash · 用时 21m23s · exit 0
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 ## UX-C 前置段四屏改造 —— 交付单
+
+▌助手 ### ① 改动文件清单（8 个，均在工单允许范围）
+
+▌助手 | 文件 | 行数 | 改动 |
+
+▌助手 |---|---|---|
+
+▌助手 | `mobile/app/onboarding/value.tsx` | 279 | 画布暖纸 + 右上柔光（三圆位版，M-UX-01 底纹未产前的合规替实现）+ logo lockup 36 
+  + 主张句 display.lg（HP-1 按语系行高 ceil 联动 140/164/168/173，3 行上限 + 32→28 缩字阶梯）+ 卖点卡 card.base（32×32 
+  brand.tint 图标方块）+ 3 点分页指示 + CTA 换 ui/Button Primary（尾 arrow-right）+ 页脚 DisclaimerPill |
+
+▌助手 | `mobile/app/onboarding/age-gate.tsx` | 317 | card.base 主卡 + 卡顶 2 段 ProgressSegments + shield-check 40×40 图标方块 + 
+  HP-2 问题句预留 2 行 + Yes=Primary(带 check)/No=Secondary（D5 双编码）+ 第二步 ListRow(SelectRow 语义) + 
+  Ghost「不方便透露」+ 底栏吸底。状态机/事件/持久化/守卫逻辑零改动 |
+
+▌助手 | `mobile/app/underage-exit.tsx` | 121 | semantic.error.tint 72×72 圆角 24 图示方块（alert-triangle 32）+ display.md 标题 + 
+  Secondary 按钮（不用品牌紫实心）+ 页脚 DisclaimerPill。禁止出口原样保留 |
+
+▌助手 | `mobile/app/photo-intro.tsx` | 349 | title.lg 区块 + 质检拦截改 warning-tint 内嵌条 + alert-triangle 16 + CTA 升 Primary 
+  面（§3.1 规格，仍是页面唯一可交互控件） |
+
+▌助手 | `mobile/src/components/DisclaimerBar.tsx` | 54 | 换皮 DisclaimerPill 规格（brand.tint 圆角 999 + shield-check 
+  14）；组件名保持——m01 S8 词干扫描依赖 |
+
+▌助手 | `mobile/src/components/AiDisclosureBar.tsx` | 82 | card.inset + warning tint 底 + semantic.warning 1pt 边 + 16pt info 
+  圆点（星芒位替换）+ 吸底态 shadow.sm；testID/顺序语义不变 |
+
+▌助手 | `mobile/src/components/YearPickerSheet.tsx` | 133 | 只换皮：抓手 + 圆角 24 + surface.card/raised 卡面 + shadow.lg + 
+  overlay.scrim token 遮罩 + 确认按钮换 ui/Button；滚轮engu确认/偏移重算语义零改动 |
+
+▌助手 | `mobile/src/features/consent/sheet.tsx` | 373 | 抓手 + 卡面 + 五要素 numbered 排列（1~5 序号 tint 圆方）+ 勾选盒 24×24 
+  圆角 8（选中 Primary 填充+白 check）+ 确认 Primary/取消 Ghost + 吸底 SafeAreaView。JSX 节点顺序（AI 告知→同意控件、CTA 为 
+  ScrollView 兄弟节点）零改动 |
+
+▌助手 ### ② 自验命令与逐条结果
+
+▌助手 | 命令 | 结果 |
+
+▌助手 |---|---|
+
+▌助手 | `npx tsc --noEmit` | ✅ 0 错 |
+
+▌助手 | `npm run lint` | ✅ 0 error；仅余 1 条**既有** warning（`report.tsx` 未用变量，属 UX-G 范围非本卡文件） |
+
+▌助手 | `node scripts/grade/m01.mjs` | 13/14 PASS。唯一 FAIL=`[S12]` **本分支既有红**：`src/features/share/cards.ts`(M1-07b 定稿 
+  SHARE_DOMAIN 单点) 与 `report-share.test.ts` 含 
+  `typara.libot.store`，与判分器两文件白名单冲突——两文件均不属本卡允许范围，未触碰，需判分器维护岗同步白名单 |
+
+▌助手 | `node scripts/grade/m02.mjs` | ✅ **FAIL 0**（53 条断言：49 PASS + 4 BLOCKED 均为既有设备阶段/范围外），退出码 0 |
+
+▌助手 | 全量单测 `node --experimental-strip-types --test` | ✅ **273 tests：272 PASS / 0 FAIL / 1 skipped**（≥273 无红） |
+
+▌助手 | `verify:m01` / `verify:m02` | m02 全绿；m01 除上述既有 S12 外全绿 |
+
+▌助手 ### ③ 模拟器截图（已连上 iPhone 18 Pro 模拟器 + Expo Go，**无需补拍**）
+
+▌助手 `runs/acceptance/UX-C-*.png`（4 屏亮色 + 2 屏暗色，OCR 校验内容正确）：
+
+▌助手 - `UX-C-value-light.png` / `UX-C-value-dark.png`
+
+▌助手 - `UX-C-age-gate-light.png`
+
+▌助手 - `UX-C-underage-exit-light.png`
+
+▌助手 - `UX-C-photo-intro-light.png` / `UX-C-photo-intro-dark.png`
+
+▌助手 ### ④ 备注与拆分建议（软上限 300 行超限 3 处）
+
+▌助手 - `consent/sheet.tsx`(373)：建议后续把五要素段数组与样式块拆 `src/features/consent/sheet-parts.ts(x)`
+
+▌助手 - `photo-intro.tsx`(349) / `age-gate.tsx`(317)：建议抽 `src/components/<屏>Header.tsx`
+
+▌助手 - 禁修改项未触碰：`typara_-ai-personality-match-insight/`、路由/状态机/埋点、依赖零新增；文案零新增 key（全部复用既有 i18n）
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+run 已结束，pane 即将关闭 · 17:52:35

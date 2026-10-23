@@ -1,0 +1,36 @@
+▌  db-9M9FXxGy
+● 运行中 · deepseek-v4.1-flash · 15m00s · tok 173.1k · 消息 84
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 grep -rn "#[0-9A-Fa-f]\{6\}\|borderRadius: [0-9]" mobile/src/components/ui/ | grep -v tokens
+
+▌助手                                         → NO_MAGIC（零裸 HEX / 零裸 borderRadius）
+
+▌助手 node --experimental-strip-types --test …（249 tests） → pass 248 / fail 0 / skipped 1（与基线一致）
+
+▌助手 ```
+
+▌助手 - 组件内零字面色值/零字面圆角：全部走 tokens；tokens 未覆盖的微几何值（6pt 圆点间距、10 圆角、12/14 
+  图标、6pt 段高）以文件顶部具名常量 + 方案 §号 注释集中声明，不散落。
+
+▌助手 - 中/英 i18n：组件一律零内置文案（`label`/`title`/`message` 由调用方按 key 解析后传入）。
+
+▌助手 - 长文本：文字容器只用 `minHeight`，chip 2 行 tail、eyebrow 1 行、body 不截断；de 最坏语言已截图验证。
+
+▌助手 ## ③ 触发上报的阻断项（未越权修改）
+
+▌助手 `npm run lint` 的 2 个 error 位于 `mobile/app/report.tsx`（34:27 `useMemo(mockModules, [])`、37:30 render 期 
+  `Date.now`），**属改动前既有基线**——`runs/queue-wave2/logs/UX-A.accept.log` 同样的两行报错，即 UX-A 被判 
+  ACCEPT_FAIL 的真正原因。该文件不在 UX-B 允许范围（归 UX-G / 报告页卡），我未触碰。建议单独开 2 
+  行热修卡：`useMemo(() => mockModules(), [])` + 把 `Date.now` 移入 `useCallback` 包裹的事件回调。
+
+▌助手 其他：`app/dev-ui-kit.tsx` 401 行已超 300 行软上限，建议后续拆 `app/dev-ui-kit/*.tsx` 
+  分段组件（本卡文件名单只允许单文件，故未拆）。
+
+▌助手 另：原 Metro 进程已退出（模拟器白屏报 "Could not connect to the server"），我在 `mobile/` 重启了 `expo start 
+  --port 8082 --host lan` 用于截图，当前仍在运行。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 15:48:52 · ses 9M9FXxGy

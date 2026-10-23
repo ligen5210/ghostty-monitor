@@ -1,0 +1,24 @@
+ 只回复 OK opencode/deepseek-v4.1-flash-  db-WXtoU1ra 
+● 运行中 · nemotron-3.5-super-vl… · 10s · tok 0 · 消息 3
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌用户 "只回复 OK"
+
+▌用户 opencode/deepseek-v4.1-flash-free
+
+▌用户 opencode/glm-5.3-flash-free
+
+▌用户 opencode/mimo-v2.6-flash-free
+
+▌用户 opencode/nemotron-3-ultra-free
+
+▌用户 opencode/flint-40b-free
+
+▌用户 opencode/beam-free
+
+▌用户 opencode/nemotron-3.5-lightning-free
+
+▌用户 opencode/nemotron-3.5-super-vl-free
+
+  … 等待（failed）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 19:32:35 · ses WXtoU1ra

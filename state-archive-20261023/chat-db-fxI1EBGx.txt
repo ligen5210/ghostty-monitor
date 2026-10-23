@@ -1,0 +1,40 @@
+▌执行 UX-G 任务卡 db-fxI1EBGx
+● 运行中 · deepseek-v4.1-flash · 4m22s · tok 101.3k · 消息 31
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 未新增依赖、未动 i18n 桶（新组件零内置文案，文案由调用方按既有 key 传入）、无动画/无阴影/无子路由。
+
+▌助手 ## ② 自验命令与逐条结果
+
+▌助手 ```bash
+
+▌助手 cd mobile && npx tsc --noEmit            # ✅ exit 0
+
+▌助手 npm run lint                             # ✅ exit 0（1 warning：app/report.tsx:20 PAYWALL_VIEWED_KEY 未使用＝改动前既有，未新增）
+
+▌助手 node scripts/grade/m07.mjs               # ✅ 10 条全 PASS，FAIL 0（S1~S10）
+
+▌助手 node --experimental-strip-types --test --disable-warning=ExperimentalWarning $(find src -name '*.test.ts')
+
+▌助手                                          # ✅ tests 282 / pass 281 / fail 0 / skipped 1（与改动前基线逐字相同）
+
+▌助手 grep -n "paletteLight" src/components/ReportAccordion.tsx   # ✅ 无匹配（无业务引用也注释已清）
+
+▌助手 ```
+
+▌助手 - **verify:m07 全绿**；全量 282 用例 vs 基线 282（0 红）。
+
+▌助手 - **support email 插值**：`src/shared/i18n/report.test.ts` 3/3 ok（en/zh 双花括号 + 真实 i18next 端到端渲染出邮箱 + 调用处传参扫描），只验未改。
+
+▌助手 ### 📌 越界发现（本卡不动，需总经理派单）
+
+▌助手 `report.support.email` 只有 en/zh-Hans 是 `{{email}}`；**es / pt-BR / ja / de / fr / it / ko / id / hi / sv 共 10 个语言仍是单花括号 `{email}`** → 这 10 语端上会显示字面 `{email}`（FIX2 只修了 en/zh，`report.test.ts` 也只断言 en/zh 两桶）。修复需改 `src/shared/i18n/locales-ext-a.ts`、`locales-ext-b.ts`，不在 UX-G 允许文件内，故仅上报。
+
+▌助手 ### 待装机补拍
+
+▌助手 暗色模式报告页一张（P0 证据）、亮色封面头+目录一张、点目录跳模块一张；另建议 UX 复核目录 15 chip 两列网格在 6.1" 屏的首屏占比（约 380pt）。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:38:14 · ses fxI1EBGx

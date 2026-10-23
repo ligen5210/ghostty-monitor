@@ -1,0 +1,37 @@
+ 执行 mojing IA-4 任务卡  db-1KJcj114 
+● 运行中 · glm-5.3-flash · 3m34s · tok 114.4k · 消息 26
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 | 层 6 主 CTA 常驻含 arrow | `<Button trailingIcon="arrow-right">`，吸底 dock 内三屏常驻 | ✅ |
+
+▌助手 | 层 7 footnote | `onboarding.value.footnote`，micro/tertiary 居中；`numberOfLines=2` 符合重设计案 §2.1「1 行，2 行允许」 | ✅ |
+
+▌助手 | 层 8 免责 pill 常驻 | `<DisclaimerPill>` 在 dock | ✅ |
+
+▌助手 | 内容区 ScrollView+CTA 固定 | 横滑 pager 内每屏竖向 ScrollView；dock 在滚动容器外，短屏/AX5 CTA 不被推走 | ✅ |
+
+▌助手 | S2/S3 内容本卡不改 | 两屏仍为既有 benefits 卡结构，key 未动（留给 IA-5） | ✅ |
+
+▌助手 | 红线：零权限/零埋点新增；CTA 行为不变（唯一 `router.replace('/onboarding/age-gate')`）；S1 主文案区无 upload/photo 硬编码（en headline=「Discov
+
+▌助手 ### ③ AC 自验结果
+
+▌助手 命令：`cd mobile && npx tsc --noEmit && npm run lint && node --test`
+
+▌助手 | 命令 | 结果 |
+
+▌助手 |---|---|
+
+▌助手 | `npx tsc --noEmit` | ✗ **红（阻断，白名单外）**：唯一报错 `app/generating.tsx(435,24) TS2339: Property 'container' does not exist`——由 **IA-8 
+  修法=在 generating.tsx `styles` 中补 `container: { flex: 1 }` 或快路径改用现有样式，建议派 IA-8 修复卡处理 |
+
+▌助手 | `npm run lint` | ✅ 绿（exit 0，0 错 0 警） |
+
+▌助手 | `node --test` | ✅ 绿：**417 tests / 416 pass / 1 skipped / 0 fail** |
+
+▌助手 **结论**：IA-4 实现已交付且代码级合规审计全条目通过；AC 标 **未验证（tsc 红）**，卡点在白名单外文件 `app/generating.tsx:435`（IA-8 遗留），非本卡
+  光装饰层/吸底 dock 各抽独立组件文件）——仅建议，未动工。
+
+  … 等待（succeeded）
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 23:43:41 · ses 1KJcj114

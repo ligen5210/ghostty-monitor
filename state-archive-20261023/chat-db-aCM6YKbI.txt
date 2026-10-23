@@ -1,0 +1,36 @@
+▌  db-aCM6YKbI
+● 运行中 · mimo-v2.6-flash · 13m32s · tok 140.1k · 消息 51
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 ## ② 自验命令与逐条结果
+
+▌助手 1. `cd mobile && npx tsc --noEmit && npm run lint` → **通过**（exit 0；lint 0 error + 1 条既有 
+  warning：`report.tsx:18 PAYWALL_VIEWED_KEY` 未使用，属卡前遗留、超本卡范围未动）
+
+▌助手 2. `node --experimental-strip-types --test ... $(find src -name '*.test.ts')` → **全量无红**：273 tests / 
+  272 pass / 0 fail / 1 skipped（skip 为既有 `blur-pool.test.ts` U2-04b `it.skip`）
+
+▌助手 3. `grep -n "currentTierId" mobile/app/report.tsx` → **`OWNED_SOURCED`**（零命中）
+
+▌助手 4. 新增 5 测试（≥4）：`[P55-01]` 空 entitlement→two/four 双模式零 owned 标；`[P55-02]` 有 L4→L1_SNAPSHOT 
+  owned（+L1_BUNDLE 含 L1、低档不含 L4、未知串/空集合 fail-closed）；`[P55-03]` 竖排结构断言 two 模式 render 
+  数=2（含无 `ScrollView`/无 `horizontal`/无 `width:260`/`styles.list` gap 竖排/four 仍 4 档）；`[P55-04]` 
+  report.tsx 零 `currentTierId` + `useGuardState` 注入；`[P55-05]` 断网点档三分支走 `toast` + 放行 
+  `start_purchase`，并断言组件接线 `gatePurchaseTap`/`IS_BACKEND_CONFIGURED`/`<Toast>` 与映射键在资源桶存在
+
+▌助手 5. 回归判分器：`m05` 10/10 PASS、`m07` 10/10 PASS（`m01`/`m12` 有红但为卡前遗留：法务 URL 散落、各语言缺 19 
+  键——均不涉本卡文件，未顺手改）
+
+▌助手 **给经理的两条说明**：
+
+▌助手 - Toast 文案按"不改 i18n 桶"约束映射既有键：网络分支 `generating.fail.network`（仅 en/zh 齐，另 10 
+  语回落英文——与 M1-FIX4 同类的键缺口，建议并入 FW15 补键工单）、价格等待分支 `paywall.price_offline`（12 
+  语齐）。
+
+▌助手 - `tiersMode="two"` 按 `tiers.ts` 既有注释口径不打 owned 标（首曝付费墙本就只对未购用户）；owned 标仅 four 
+  报告升级位生效。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 17:09:38 · ses aCM6YKbI

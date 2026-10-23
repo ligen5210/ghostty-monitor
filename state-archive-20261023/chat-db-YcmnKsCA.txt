@@ -1,0 +1,36 @@
+▌  db-YcmnKsCA
+● 运行中 · mimo-v2.6-flash · 22m12s · tok 189.1k · 消息 77
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 ### ③ 自验命令与逐条结果
+
+▌助手 ```
+
+▌助手 cd mobile && npx tsc --noEmit                     → 0 error ✅
+
+▌助手 npm run lint                                       → 0 error / 1 warning（存量：app/report.tsx:17 
+  PAYWALL_VIEWED_KEY 未用，非本卡文件，留 FIX5）✅
+
+▌助手 node --experimental-strip-types --test … (find src -name '*.test.ts')
+
+▌助手                                                    → 268 tests / 267 pass / 0 fail / 1 skipped（存量 
+  blur-pool）✅
+
+▌助手 grep -rn ">[A-Z][a-z]" mobile/app/photo-intro.tsx mobile/app/generating.tsx | grep -v "t(" | grep -v "//"
+
+▌助手                                                    → NO_HARDCODED ✅
+
+▌助手 新增 index.test.ts 4 例（22 键双桶齐 ≥10 / zh-Hans 渲染中文非英文 / 五文件 <Text> 零字面文案 / 
+  两屏恢复守卫）→ 4 pass 0 fail ✅
+
+▌助手 node scripts/grade/m01.mjs → 13/14 PASS（S12 法务 URL 散落为存量，涉文件非本卡）；m02.mjs → exit 0 ✅
+
+▌助手 ```
+
+▌助手 自验已验证；`photo-intro.tsx` 恰 300 行触软上限，建议下一张卡拆出同意日志/埋点处理器。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 16:57:51 · ses YcmnKsCA

@@ -1,0 +1,37 @@
+ 执行 FIX-I18N1 任务卡片  db-BUGcTsEn 
+已完成 · nemotron-3-ultra-… · 用时 14m01s · exit 0
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 - `generating.fail.later` - Later button
+
+▌助手 - `generating.fail.providerDown` - Provider side issue
+
+▌助手 - `generating.fail.quota` - Free slots used up
+
+▌助手 - `generating.fail.rateLimited` - Rate limited
+
+▌助手 - `generating.fail.rephoto` - Try another photo
+
+▌助手 - `generating.fail.saved` - Answers saved
+
+▌助手 - `generating.priming.title` - Priming card title (20s background)
+
+▌助手 - `generating.priming.body` - Priming card body
+
+▌助手 - `generating.priming.cta` - Priming card CTA
+
+▌助手 **Self-verification:**
+
+▌助手 - ✅ All 354 tests pass (0 failures, was 1 failure before)
+
+▌助手 - ✅ No test assertions modified
+
+▌助手 - ✅ Translations are non-empty and idiomatic for each language
+
+▌助手 - ⚠️ TypeScript/lint errors are pre-existing (missing `expo-notifications` module, unrelated to i18n changes)
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+run 已结束，pane 即将关闭 · 19:15:57

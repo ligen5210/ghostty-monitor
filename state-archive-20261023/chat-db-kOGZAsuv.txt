@@ -1,0 +1,42 @@
+▌执行BE-9任务卡片 db-kOGZAsuv
+● 运行中 · mimo-v2.6-flash · 24m27s · tok 231.9k · 消息 64
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  `countTodayCalls,` 即可，不重写实现；generate 侧同源复用。
+
+▌助手 - **计数源=events**（满足"count by name+install+UTC 日界"）：`event_name=generation_result` + `install_id` + 
+  `ts>=今日00:00Z`，`limit=DAILY_L0_LIMIT+1` 截断；不新增表、不加 migration，走 `typaraREST` 唯一出口（Content-Profile: 
+  typara，service_role 已授权）。注：`generation_result` 按 PRD §6 是"服务端代发"事件、发射卡尚未落地，故上线前该计数恒 
+  0（已在注释标明）。
+
+▌助手 - **软预算接线方式**：首次与重试共享同一条 `Date.now()+SOFT_BUDGET_MS` 截止线，每次 provider 调用包「剩余预算」→ 整段严格 
+  ≤75s，超时即 504 且**不再发起重试调用**；下游本体不取消（race 已挂处置器，晚到 settle 不产生 UnhandledPromiseRejection）。
+
+▌助手 - **TIMEOUT 不落库**：`GenRow.status` 联合类型无 `'timeout'`（repo 也无该写接口），本卡按"仅接线超时判定"只记 
+  `generate.timeout`/`report.timeout` + 504；账本 timeout 态待 repo 写接口卡。
+
+▌助手 ## ④ 卡尾说明（BE-10）
+
+▌助手 - **真版本比对未接**：`_shared/env` 只有读取器、`_shared/config` 无 consent 版本常量，全仓 `version_hash` 
+  只在移动端——按卡片"禁自造版本值"只做缺失/空/形状闸，真版本比对（含 M02 15-S1② 过期判定）**待版本源常量接线**。
+
+▌助手 - **照片撤回闸未接**：functions 内 grep `delete_logs`/consent 撤回件零命中（表只在 migrations），不硬造，**待 repo 
+  撤回标记接线**（M02 15-S1③）。
+
+▌助手 - 形状按 AC-M01-12 冻结口径 `/^[0-9a-f]{64}:[0-9a-f]{64}$/i`（`sha256(privacy):sha256(tos)`）。
+
+▌助手 - **§3 差异**：§3 的 report 行只写 `consent:{version_hash}`，卡片要求两函数给全量形状 → 按卡片给全量；`granted_at` 
+  本层不校验，§3 形状的 report 运行期照样放行。
+
+▌助手 - 校验段位置：两 handler 顶部 ⓪，先于照片/kill/权益；`checkConsent` 定义在 generate/handler.ts、report 复用（沿用 
+  errors-map/lane/art9 跨目录先例，未新造 `_shared` 文件）。
+
+▌助手 **超软上限提示**：`typara-generate/handler.test.ts`(335) 与 `typara-report/handler.test.ts`(366) 超 300 
+  行，建议后续把日限/consent 用例拆成 `handler.limit.test.ts`；`typara-report/handler.ts`(298) 已贴线。
+
+▌助手 改动文件全部落在两卡允许清单并集内（7 个），无越界文件、未碰 migrations/车道判定/阈值语义、无 git。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 17:53:45 · ses kOGZAsuv

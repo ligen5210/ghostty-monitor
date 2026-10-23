@@ -1,0 +1,36 @@
+▌  db-lZ0cAUyN
+● 运行中 · glm-5.3-flash · 2m47s · tok 243.9k · 消息 20
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  §3.1~3.8 逐条规格与 §6 不破版规则
+
+▌助手 - `mobile/app/dev-ui-kit.tsx`（401 行）— 九件套四态（rest/pressed/disabled/de 长文本）分段展示区已就位
+
+▌助手 - 零魔法值、组件不内置文案（i18n key 只在调用点/由调用方传入）、未装依赖、未动 PaywallBlock/ReportAccordion 
+  等业务组件、未动 UX-A 产物与红烧线（§9）
+
+▌助手 **② 自验结果（逐条）**：
+
+▌助手 | 命令 | 结果 |
+
+▌助手 |---|---|
+
+▌助手 | `npx tsc --noEmit -p mobile` | ✅ 0 错误 |
+
+▌助手 | `npm --prefix mobile run lint` | ⚠️ 2 error + 2 warning，**全部位于 UX-B 允许范围外**（`app/report.tsx` 
+  eager 触发 `Date.now`，系 M1-FE1/M1-07b 既有基线红，早于 UX-B 全部提交；`scripts/grade/m07.mjs` unused 
+  警告）。本次零新增红 |
+
+▌助手 | 魔法值 grep（ui/ 目录） | ✅ `NO_MAGIC` |
+
+▌助手 | `node --test`（49 个 *.test.ts） | ✅ 248 pass / **0 fail** / 1 skip，≥现基线无红 |
+
+▌助手 | 四态截图 | ✅ `runs/acceptance/ux/UX-B-01~19-*.png` 共 **19 张**（≥要求 9 张，含 15 en 亮 + de/ja/zh 
+  长文本 + 5 张暗色） |
+
+▌助手 卡尾 Runner 已代收两份提审，判分以 runner 结果为准；预期判分全部完整无缺陷。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 15:51:58 · ses lZ0cAUyN

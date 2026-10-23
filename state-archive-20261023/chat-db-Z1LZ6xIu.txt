@@ -1,0 +1,40 @@
+▌执行 FW-15：mobile 类型检查与 lint db-Z1LZ6xIu
+● 运行中 · glm-5.3-flash-free · 4m16s · tok 217.0k · 消息 33
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  修了非 en/zh 桶内明确定性错误的 11 处：
+
+▌助手 - **es**：`settings.dns.label` "No vendes"（第二人称）→ 不定式 "No vender ni compartir"（与 pt-BR 同口径）
+
+▌助手 - **de**：`ein warmes Snack` → `einen warmen Snack`（性数格）；`Ihre Meldung` → `deine Meldung`（de 桶其余全用 du/dein，人称统一）
+
+▌助手 - **id**：`kennal`（非词）→ `berkenalan`（`meet_cute_scenarios` + paywall bundle 两处）
+
+▌助手 - **sv**：`Hopplur`/`gnyva`（非词）→ `Hopkrupen`/`gnistor`；`Städad rum` → `Städat rum`；`En varm snack` → `Ett varmt snacks`；`krångel inget` → `utan krångel`；`Detektor kärlekshinder` → `Detektor för kärlekshinder`
+
+▌助手 未动 en/zh（仅 index.ts/admin 值，P40 残留已在先前修复：zh `settings.language.section`='语言'，设置页渲染 `t()` 单语键）；未加新功能键；禁 git 遵守。
+
+▌助手 ## ② 自验命令与逐条结果
+
+▌助手 | 命令 | 结果 |
+
+▌助手 |---|---|
+
+▌助手 | `cd mobile && npx tsc --noEmit` | ✅ 0 错误 |
+
+▌助手 | `cd mobile && npm run lint` | ✅ 0 错误 |
+
+▌助手 | `node --experimental-strip-types --test …（find src）` | ✅ **293 tests：292 pass / 0 fail / 1 skip**（≥290 达标；skip=`blur-pool.test.ts` M05「待文案定稿后复跑」，先前存在，与本卡无关） |
+
+▌助手 | `node scripts/ci/check_i18n_keys.mjs \|\| true` | ⚠️ 红为预期：该脚本仍按 M0 目录式 `locales/*.json` 布局检查，12 键真源实际落在 TS 桶（`quiz/report/locales-ext-a/b/index` 内联）；strict 口径下的真守卫=`index.test.ts`，上方测试已绿。脚本不在本卡允许改清单 |
+
+▌助手 | 禁词扫描 `check_banned_words.mjs mobile/src` | ✅ exit 0（仅文件头注释命中，通过） |
+
+▌助手 | 独立复核 146 键 strict diff（quiz 32 + report 51 + index 内联 63 = 146） | ✅ **10 语（es/pt-BR/fr/de/it/ja/ko/id/hi/sv）全部 146 键：missing=0 / extra=0 / empty=0 / dup=0** |
+
+▌助手 | FW-15 三测试（index.test.ts） | ✅ 键集 diff=0 + 19 补键非空 / zh 设置标题单语（无「语言 / Language」并存）/ `{{email}}` 插值零泄漏 |
+
+▌助手 **已验证**（tsc/lint/单测三条全部跑通转绿，全部改动仅限卡片允许文件，无 git 操作）。
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:37:52 · ses Z1LZ6xIu

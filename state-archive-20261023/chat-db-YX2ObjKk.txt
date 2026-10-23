@@ -1,0 +1,37 @@
+ 执行 S26-SRV 任务卡片  db-YX2ObjKk 
+● 运行中 · deepseek-v4.1-flash · 59s · tok 35.7k · 消息 13
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手    - 走 `options.warn ?? logWarn` 注入出口；不做 WeakSet 去重；`logWarn` 已是值导入（原 25 行），无需补
+
+▌助手    - `TyparaError` 返回值/状态码/文案零改动
+
+▌助手 2. `supabase/functions/_shared/consent-version.test.ts`（+32 行）
+
+▌助手    - 文件头覆盖清单补第 ⑥ 项
+
+▌助手    - `SEC-4 · sentinel 全零占位拒绝` describe 内新增两条：
+
+▌助手      - 拒绝时 warn 收到 `consent.version_placeholder_rejected`，连打 2 次断言 2 条（证不去重），fields 深等于 `{ code: 'CONSENT_MISSING', gap: 'G
+
+▌助手      - 合法非占位哈希 `'1'*64:'2'*64` 空白名单放行 → warn 仅 `consent.version_allowlist_empty`，无占位事件
+
+▌助手 **自验命令与结果**
+
+▌助手 ```
+
+▌助手 $ npx --yes -p typescript@~6.0.3 tsc --noEmit -p supabase/functions/tsconfig.typecheck.json && \
+
+▌助手   node --test --experimental-strip-types --disable-warning=ExperimentalWarning "supabase/functions/**/*.test.ts"
+
+▌助手 # tests 282  # pass 282  # fail 0  # duration_ms 327.78
+
+▌助手 ```
+
+▌助手 未做 git 操作（按本次执行指令禁用）。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 22:45:11 · ses YX2ObjKk

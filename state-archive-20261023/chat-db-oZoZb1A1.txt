@@ -1,0 +1,41 @@
+▌执行 FW-15 任务卡并完成校验 db-oZoZb1A1
+● 运行中 · deepseek-v4.1-flash-f… · 6m35s · tok 124.9k · 消息 64
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 | `mobile/src/shared/i18n/index.ts` | +4 / -3 | 仅注释键数口径 127→146 |
+
+▌助手 | `mobile/src/shared/i18n/index.test.ts` | +84 / -0 | 新增 FW-15 三段测试（10 语 strict diff=0 + 补键非空、zh 分组标题单语、`{{email}}` 插值） |
+
+▌助手 | `mobile/src/shared/i18n/report.ts` | +2 / -2 | zh 双语标题残留修正：`语言 / Language`→`语言`、`关于 / About`→`关于`（verify2 P40） |
+
+▌助手 **diff 实况：不止 8 键，10 语各缺 19 键**（复数 `_one/_other`、`settings.restore.none/running`、`settings.language.section/current`、`settings.about.section`、`settings.entry`、`generating.tease.1~3/fail.timeout/fail.network/retry`、`agegate.year.title/unselected/confirm`、`agegate.prefer_not_say/hint`），已按 en 源同序插入，各桶 146 键、零重复、零空值；"for entertainment only" 各语原有合规句保留。
+
+▌助手 ## ② 自验命令与逐条结果
+
+▌助手 | 命令 | 结果 |
+
+▌助手 |---|---|
+
+▌助手 | `cd mobile && npx tsc --noEmit` | ✅ 0 错误（TSC_OK） |
+
+▌助手 | `cd mobile && npm run lint` | ✅ 0 告警（LINT_OK） |
+
+▌助手 | `node --experimental-strip-types --test … $(find src -name '*.test.ts')` | ✅ 293 测试 / 292 pass / **0 fail** / 1 skipped（≥290 无红）；新增 3 段 FW-15 全绿 |
+
+▌助手 | `node scripts/ci/check_i18n_keys.mjs \|\| true` | ⚠️ N/A：该脚本不存在（`scripts/ci/` 只有 `check_wellknown.mjs`），按 `\|\| true` 记跳过；未新建（越界） |
+
+▌助手 | 附：`node scripts/grade/m12.mjs`（只读参考） | 10 语 missing 全为 **0**（原各 19）；`zh-Hans` 仍缺 2（`quiz.hint.remaining_one/_other`）——**改动前即如此**，系 zh 复数单式既定口径（`quiz.ts` M1-FIX2 注释 + `quiz.test.ts` 断言禁止 zh 加 `_one`），不属本卡范围 |
+
+▌助手 **说明**
+
+▌助手 - 工作目录 `wt-db/mobile` 无 `node_modules`，自验临时软链主仓 `mojing/mobile/node_modules`，验完已删除；未做任何 git 操作（对比用 `diff`），`app/` 与其余 src 文件零改动。
+
+▌助手 - `index.test.ts` 现 330 行（超 300 软上限）：建议后续把 FW-15 三段测试拆到 `locales-ext.test.ts`。
+
+▌助手 - `zh` 双语标题修正后，i18n 中已无「语言 / Language」式中英并存。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:33:26 · ses oZoZb1A1

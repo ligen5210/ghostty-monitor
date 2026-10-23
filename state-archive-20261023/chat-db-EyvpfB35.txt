@@ -1,0 +1,40 @@
+▌UX-F 任务执行 db-EyvpfB35
+● 运行中 · deepseek-v4.1-flash · 9m36s · tok 285.0k · 消息 85
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 | 文件 | 行数 | 内容 |
+
+▌助手 |---|---|---|
+
+▌助手 | `mobile/app/l0.tsx` | 158 | 页眉：透镜 T 的横版组合标识（lockup）28pt + 齿轮入口 + 免责提示常驻；头卡 `card.elevated`（品牌圆点 + `l0.title` title.lg + 副文案）；正文接 L0Glance；页内付费墙 |
+
+▌助手 | `mobile/src/features/l0/L0Glance.tsx` | 148 | 2 行明文各自套 `card.inset`（行首 caption.lg 700 全大写标签 + subtitle.lg 19/600 / body.lg）；3 个模糊占位格合并为一块 `card.inset`（placeholder.blur 底 + 白卡占位块 + lock + locked chip） |
+
+▌助手 | `mobile/src/components/PaywallBlock.tsx` | 401 | 区块 `card.inset` 底 + eyebrow（`paywall.subtitle`）→ two 模式为竖排两卡（名称/卖点/价格 `display.md` tabular/CTA 分层；best-value 2pt 品牌边框 + 3pt 光谱条 + warm 角标位 + Primary）/ four 模式为紧凑四行卡（左信息、中价格、右 44pt 小按钮，已购显示「已拥有」文字）；离线价格位 `—` + `paywall.price_offline` |
+
+▌助手 未改任何 `*.test.ts`（既有测试原样通过）；未执行任何 git 写操作。
+
+▌助手 ② 自验命令与逐条结果
+
+▌助手 ```
+
+▌助手 npx tsc --noEmit                → PASS（0 错）
+
+▌助手 npm run lint                    → 0 error（余 1 warning 在 app/report.tsx:18，属 UX-G 范围）
+
+▌助手 node scripts/grade/m05.mjs      → PASS 10 / FAIL 0（S1~S10 全绿，白名单 4 键 + 2 明文/3 模糊口径不变）
+
+▌助手 node --experimental-strip-types --test $(find src -name '*.test.ts')
+
+▌助手                                 → 282 tests / 281 pass / 0 fail / 1 skip ≥273 达标
+
+▌助手 ```
+
+▌助手 红线：4 键白名单 fail-closed 与本地占位池渲染语义零改动；免责双展示同键（m05 S4 实证）；付费墙仍为页内嵌、未接商店价格 API、未动曝光埋点、未碰 report.tsx。
+
+▌助手 已知取舍：i18n 桶不在本卡文件范围 → 可见文案全部复用既有键（`module.vibe_print`/`module.type_profile`/`share.vibe.locked`/`consent.cta.confirm`），功能清单 3 行与「15 个深度模块」chip 缺键暂以 locked chip 替代；save% 角标位已留（`savePercent` 注入即渲染）并**删除了原 `save_badge` 传 0 的假折扣**；`PaywallBlock.tsx` 401 行超 300 软上限，建议拆 TierCard/TierRow/SpectrumBar（详见卡尾回填）。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:33:33 · ses EyvpfB35

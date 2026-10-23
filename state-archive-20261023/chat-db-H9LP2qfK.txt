@@ -1,0 +1,37 @@
+ 执行 QA7 任务并校验 tsc 与 lint  db-H9LP2qfK 
+已完成 · deepseek-v4.1-fla… · 用时 17m04s · exit 0
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 3) tsc --noEmit -p supabase/functions/tsconfig.typecheck.json → TYPECHECK_OK
+
+▌助手 4) node --test "supabase/functions/**/*.test.ts"           → tests 241 / pass 241 / fail 0
+
+▌助手 5) grep "0\.1\.0" session.ts upload.ts                      → VERSION_UNIFIED
+
+▌助手 6) grep -c "ALL_ERROR_CODES\|ERROR_HTTP" _shared/errors.ts  → 6（errors.ts 未改，表 17 码不动）
+
+▌助手 ```
+
+▌助手 新增用例 **15 条**（后端 10 / 移动 5），全部绿。
+
+▌助手 ## ③ 卡尾注（口径与残余，必须看）
+
+▌助手 - **P2#2 走法**：先数表 = 17 码（含 INTERNAL），故**不新增 INVALID_REQUEST**；session/restore 的非法请求改为表内 `INTERNAL`
+
+▌助手 - **P2#2 残余（超本卡文件范围，未动）**：`typara-appstore-verify/handler.ts:34,108`、`typara-play-verify/handler.ts:25,87` 
+
+▌助手 - **P2#4 落地形态**：handler 侧已调 `saveError(id,'timeout')`，但 repo 实现（`typara-generate/index.ts:309`，非本卡允许文件
+
+▌助手 - **P2#6 值**：卡面写「app.json 的 0.1.2」，实际 `mobile/app.json:5` = **0.1.1**（无 0.1.2），故常量取 0.1.1；`version.test
+
+▌助手 - **环境补丁（非代码）**：本 worktree 的 `mobile/node_modules` 缺 `expo-notifications`/`expo-application`/`badgin`（3 包，
+
+▌助手 - **超软上限（既有）**：`typara-generate/handler.ts` 315 行、`events/upload.ts` 469 行本就 >300，建议后续拆（provider 重试
+
+▌助手 - 未做 git 任何操作，未碰 RLS/lane/验签/错误码语义。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+run 已结束，pane 即将关闭 · 20:07:25

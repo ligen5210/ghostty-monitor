@@ -1,0 +1,37 @@
+ 审查 v4→v5 补丁：删除跨卡负缓存机制  db-ARKfVSRq 
+● 运行中 · deepseek-v4.1-flash · code-reviewer · 9m12s · tok 92.3k · 消息 23
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ 
+Let me do it.
+
+⚙ shell [completed] set -u; mkdir -p /tmp/br-v5x/home2/.opencode/bin cat > /tmp/br-v5x/home2/.opencode/bin/opencode <<'SH' #!/bin/bash if [[ "${1:-}" =
+  ⎿ [23:24:39] 免费探活选中 opencode/deepseek-v4.1-flash-free ⏎ [23:24:39] 派发 t（opencode/deepseek-v4.1-flash-free，stage=free，第 1 次尝试，超时 5s
+
+◈ 思考流（最近）
+ 
+One more check for the runner: `case "$result" in TIMEOUT|STALL)` — also note `stall` detection for free cards uses STALL_SEC=300 default; fine.
+ 
+Additional check: in the runner's free accounting, `[[ "$chain" -ne 1 ]] && free_quota=...` — with `set -u` and `chain` declared `local chain=0` in the
+ 
+Another possible issue: `excl_add "$model"` also excludes when result is GRADER_MUTATED — intended? Punishing a model for a mutated grader is odd but h
+ 
+Let me quickly test agent-run real-failure path.
+
+⚙ shell [completed] cd /tmp/br-v5x && cat > /tmp/br-v5x/home2/.opencode/bin/opencode <<'SH' #!/bin/bash if [[ "${1:-}" = "models" ]]; then   for m in d
+  ⎿ [23:24:55] 免费探活选中 opencode/deepseek-v4.1-flash-free ⏎ [23:24:55] 派发 t（opencode/deepseek-v4.1-flash-free，stage=free，第 1 次尝试，超时 5s
+  ⎿ 选: opencode-go/mimo-v2
+
+◈ 思考流（最近）
+ 
+Now, runner: I have a strong empirical counterexample for BATCH_HUNG. Let me also confirm the subshell defect independently at the runner level, e.g. b
+- copy batch-runner.sh
+- insert after `if [[ -n "$killed" ]]; then result=...` block: in free stage? Simpler: right after computing result from killed, add:
+  `if [[ -n "$killed" && "$stage" = "free" && -n "$model" ]]; then hung_add "$model"; log "HUNG-PROBE ${model}"; fi`
+- then run 2 cards and observe card 2 still dispatches the hung model → proves subshell loss.
+ 
+Good. Let me do it.
+
+⚙ shell [running] set -u; cd /tmp/br-v5x && cp /private/tmp/br-v5/batch-runner.sh br-probe.sh python3 - <<'PY' import re p='/tmp/br-v5x/br-probe.sh' s=
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 23:26:52 · ses ARKfVSRq

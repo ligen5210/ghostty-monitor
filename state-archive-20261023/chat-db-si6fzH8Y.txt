@@ -1,0 +1,41 @@
+▌BE-5 卡片任务执行 db-si6fzH8Y
+● 运行中 · deepseek-v4.1-flash-f… · 14m28s · tok 193.8k · 消息 46
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 实现要点：验签纯逻辑**零重写**（appstore/play/restore 全部 `import` `typara-verify/verify-logic.ts` 的 `verifyTransaction` / `classifyRestore` / `failClosedOnError`）；handler 全注入零直连；index 只编排（JWT claims、REST、env）；零新依赖、纯 ESM、无 `any`/`require`/`console`、单文件均 <300 行。
+
+▌助手 ## ② 自验命令与逐条结果
+
+▌助手 | 命令 | 结果 |
+
+▌助手 |---|---|
+
+▌助手 | `npx --yes -p typescript@~6.0.3 tsc --noEmit -p supabase/functions/tsconfig.typecheck.json` | ❌ **exit 2**——仅 2 条错误，均在**本卡范围外的既有文件**：`typara-generate/index.ts:214`、`typara-report/index.ts:237`（`consent` 未接线）。新增 6 目录 **0 错误** |
+
+▌助手 | 同上但隔离只含本卡 6 目录 + 依赖（临时 config） | ✅ **exit 0**，零错误 |
+
+▌助手 | `node --test ... "supabase/functions/**/*.test.ts"` | ✅ **205 tests / 201 pass / 4 fail**——4 条均为**既有失败**：`generate:58/60`、`report:150/151`（同一 `consent` 根因） |
+
+▌助手 | 仅本卡 6 个 `*.test.ts` | ✅ **33 tests / 33 pass / 0 fail**（appstore 7 / play 6 / restore 7 / notify 4 / reconcile 5 / quota 4，每函数 ≥1 正向 + ≥1 fail-closed） |
+
+▌助手 **基线偏差（必须说明，非本卡引入）**：卡载基线是「tsc 0 + 172 全绿」，但本工作树 `/dev/wt-db` 是**陈旧基线**——`typara-generate/handler.ts`、`typara-report/handler.ts` 已是 BE-10 后版本（`consent` 必填），而两个 `index.ts` 还是 BE-10 前的（主仓 `/dev/mojing` 同名文件已含 `parseConsent` 接线）。修复=把主仓那两个文件的 BE-10 改动同步过来，属**工单范围外文件**，
+  按边界我未改动、也未做任何 git 操作。请总经理裁决：补同步工单，或直接以主仓基线重跑本卡。
+
+▌助手 ## ③ 代码内已注明的契约偏差（不阻塞）
+
+▌助手 1. 400 档：§2 封闭枚举无 400，沿用 `typara-session` 先例用字面量 `INVALID_REQUEST`（未注册进码表）。
+
+▌助手 2. cron/quota secret 缺失 → 501 走 §2 唯一 501 码 `VERIFY_NOT_CONFIGURED`（语义=开关未配置）。
+
+▌助手 3. `restore_bindings.result` 的库内 CHECK 仅含 `rebound/skipped_refunded/skipped_revoked`，v1.1 契约的 `skipped_other` 需 M11 迁移扩枚举；当前审计写入被拒时只记日志不阻断重绑。
+
+▌助手 4. 真实凭据未接：Apple JWS 验签 / ASSAPI / Play Developer API / Management API 生产实现均 fail-closed（`VERIFY_GRANT_ENABLED` 缺省 false → 501），接线点集中在各 `index.ts` 单函数体；Play 服务端 `acknowledge` 待凭据接线时补（纯函数 `needsAcknowledge` 已在）。
+
+▌助手 5. `lane_audit.eu_deepseek` 静态 0（M11 审计卡补真扫）；quota 计量全 0 + thresholds 从 env（默认 500MB/5GB/500k/50k，PRD §11.7①）。
+
+▌助手 6. appstore/play/restore 的 `upsertEntitlement/backfillStorefront/listEntitlement` REST 接线在三个 index 内各有一份（卡限制只能建 3 文件/目录，未抽 `_shared`），建议后续卡抽共享件。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:12:53 · ses si6fzH8Y

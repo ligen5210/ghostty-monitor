@@ -1,0 +1,40 @@
+▌执行 MERGE-TOC.md 冲突文件合并任务 db-BuowXR4T
+● 运行中 · deepseek-v4.1-flash · 3m37s · tok 53.1k · 消息 28
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 cd mobile && npx tsc --noEmit
+
+▌助手 # 无输出，0 error ✅
+
+▌助手 ```
+
+▌助手 ```bash
+
+▌助手 node --experimental-strip-types --test --disable-warning=ExperimentalWarning $(find src -name '*.test.ts')
+
+▌助手 # tests 355 / pass 353 / fail 1 / skipped 1
+
+▌助手 # 唯一红 = [FW-15][F14] 每语键集=en 键集（es 缺 generating.* 等）→ 基线允许的唯一红件 ✅
+
+▌助手 ```
+
+▌助手 ```bash
+
+▌助手 node --experimental-strip-types --test ... src/components/report/ReportToc.test.ts
+
+▌助手 # 4 tests / 4 pass / 0 fail ✅（15 slug 覆盖、offset 表、onPress 滚动三条 + 子路由卡全绿）
+
+▌助手 ```
+
+▌助手 ```bash
+
+▌助手 npx eslint src/components/report/ReportToc.tsx app/report.tsx
+
+▌助手 # 输出空，exit 0 → 0 error ✅（连 0 warning）
+
+▌助手 ```
+
+▌助手 未执行任何 git 命令；未改冲突文件之外的任何文件。
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 19:00:59 · ses BuowXR4T

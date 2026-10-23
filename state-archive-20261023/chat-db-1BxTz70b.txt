@@ -1,0 +1,41 @@
+▌执行 INTEG-1 卡片任务并输出 DONE db-1BxTz70b
+● 运行中 · deepseek-v4.1-flash-f… · 3m06s · tok 64.2k · 消息 46
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 | `supabase/functions/typara-generate/index.test.ts` | 167 行 | `validBody()` 的 `consent.version_hash` 由 `'hash-1'` 改为 BE-10 合法 64:64 hex；正常请求用例补一条 `request.consent` 透传断言 |
+
+▌助手 | `supabase/functions/typara-report/index.test.ts` | 199 行 | `validBody()` 同上改合法 hex（按 §3 report 只发 `ConsentRef`，不造 `granted_at`） |
+
+▌助手 行为语义零回退：`Deno.serve` 入口、双 claim 401、consent 缺/空 → 403 `CONSENT_MISSING`、64:64 hex 形状闸仍全在 handler ⓪（入口只做在位闸，不复制判定）、photo 413/422 顺序不变。handler/deps/errors 未动。
+
+▌助手 **4 条红测试原因**：全部是「index 未把 consent 交给 handler → handler ⓪ 命中 `checkConsent(undefined)` 回 403」，叠加测试造请求用的是非 BE-10 合法 hash（`hash-1`）。按 BE-10 语义给测试请求补合法 consent，未把字段改可选。
+
+▌助手 ## 自验逐条
+
+▌助手 ```
+
+▌助手 $ npx --yes -p typescript@~6.0.3 tsc --noEmit -p supabase/functions/tsconfig.typecheck.json
+
+▌助手 → exit=0，0 错
+
+▌助手 $ node --test --experimental-strip-types --disable-warning=ExperimentalWarning "supabase/functions/**/*.test.ts"
+
+▌助手 → tests 172 / pass 172 / fail 0
+
+▌助手 ```
+
+▌助手 原 4 条红用例现全绿：`#58 photo 超 600KB → 413`、`#60 generate 正常请求`、`#150 is_regen 409`、`#151 report 正常请求`。基线达成（172/172/0）。
+
+▌助手 ## 偏差申报（需经理知悉）
+
+▌助手 - 卡片允许清单写的是「必要时两处 `handler.test.ts`」，但 4 条红测试实际落在两处 **`index.test.ts`**（handler.test.ts 本已全绿）。为完成卡片任务 2，最小化改动了这两个测试文件的 fixtures（合法 hash + 1 条透
+  传断言），未放松任何 BE-10 断言。
+
+▌助手 - 两文件已超 300 行软上限（356 / 380，改动前即超）：建议后续把 `readJsonBody/readEdgeCountry/readClientIp/base64ByteLength/parsePhoto/parseConsent/parseQuiz` 抽到 `_shared/http-parse.ts` 与 `_shared/consent.ts`，本卡范围外不做。
+
+▌助手 - 未执行任何 git 操作。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:00:42 · ses 1BxTz70b

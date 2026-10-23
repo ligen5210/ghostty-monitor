@@ -1,0 +1,40 @@
+▌执行 FW-10 任务：mobile 类型检查与 lint db-Xon3Ewx9
+● 运行中 · deepseek-v4.1-flash-f… · 5m45s · tok 103.1k · 消息 56
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 未新建 i18n 键：`share.export`、`share.footer.prefix` 等既有键足够，避开 M12 grader「12 语言键集一致（=146）」的联动（加键必须同步 10 个外语气包，超出本卡可改范围）。
+
+▌助手 ### ② 自验命令与逐条结果
+
+▌助手 ```
+
+▌助手 cd mobile && npx tsc --noEmit && npm run lint
+
+▌助手 → TSC_OK；eslint 0 problems（原 report.tsx PAYWALL_VIEWED_KEY unused warning 已消除）
+
+▌助手 node --experimental-strip-types --test --disable-warning=ExperimentalWarning $(find src -name '*.test.ts')
+
+▌助手 → tests 290 / pass 289 / fail 0 / skipped 1（基线 283 → 290，新增 7 条）
+
+▌助手 grep -q "share-entry-l0" app/l0.tsx && grep -q "share-entry-report" app/report.tsx && echo DUAL_ENTRY_OK
+
+▌助手 → DUAL_ENTRY_OK
+
+▌助手 ```
+
+▌助手 附带回归（非本卡要求，确认未破既有判分）：`m05` 10/10 PASS、`m07` 10/10 PASS；`m01` S12 仍只报 `cards.ts`/`report-share.test.ts`（本卡前即存在的旧账，工作量已避免新增域名字面量）；`m12` 的 S4/S6（127 vs 146 键）为本卡前既有红
+  ，本卡未碰键集。
+
+▌助手 ### ③ 缺口（诚实标注）
+
+▌助手 1. **PNG 导出未实现**：`expo-view-shot`/`expo-sharing` 不在依赖白名单，`exportCardPng(): Promise<string | null>` 恒返 null（源码内 `TODO(FW-10b 引依赖审批)`），分享走 `Share.share({ message })` 文案+短链；预览页有 `share-export` 按钮但只产文本分享。
+
+▌助手 2. **`paywall.viewed_at` 目前无人写入**：全仓（含主仓 mobile）只有读取方，无写入方。曝光写入属 M05 付费墙曝光接线（出本卡范围、且不得碰付费墙逻辑）→ 在该卡落地前，两个
+  分享入口在真机保持隐藏（符合 PRD「发放晚于曝光」，非本卡缺陷）。
+
+▌助手 3. **曝光闸读取时机**=屏幕挂载一次（无 useFocusEffect 先例）；若后续曝光写入需要同屏即时显隐，由 M05 卡补焦点刷新或状态订阅。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:23:18 · ses Xon3Ewx9

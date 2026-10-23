@@ -1,0 +1,73 @@
+▌  db-XwsCmxrx
+● 运行中 · deepseek-v4.1-flash-free · 1m31s · tok 41.5k · 消息 18
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+⚙ shell [completed] cd /Volumes/移动硬盘/dev/wt-db && npx --yes -p typescript@~6.0.3 tsc --noEmit -p 
+  supabase/functions/tsconfig.typecheck.json 2>&1 | tail -20; echo "TSC_EXIT=$?"
+  ⎿ TSC_EXIT=0 ⏎ 
+
+⚙ shell [completed] cd /Volumes/移动硬盘/dev/wt-db && node --test --experimental-strip-types 
+  --disable-warning=ExperimentalWarning "supabase/functions/**/*.test.ts" 2>&1 | tail -30; echo 
+  "TEST_EXIT=${pipestatus[1]}"
+  ⎿   duration_ms: 0.11675 ⏎   type: 'test' ⏎   ... ⏎ # Subtest: restore 七态分类：退款/撤销不重绑，refunded 
+  ⎿ 与 revoked 不混算 ⏎ ok 135 - restore 七态分类：退款/撤销不重绑，refunded 与 revoked 不混算 ⏎   --- ⏎   
+  ⎿ duration_ms: 3.201583 ⏎   type: 'test' ⏎   ... ⏎ # Subtest: 退款作废计划：券联动、报告不追回 ⏎ ok 136 - 
+  ⎿ 退款作废计划：券联动、报告不追回 ⏎   --- ⏎   duration_ms: 0.118292 ⏎   type: 'test' ⏎   ... ⏎ # Subtest: 
+  ⎿ Play 补 acknowledge 判定 ⏎ ok 137 - Play 补 acknowled
+
+◈ 思考流（最近）
+ 
+Now also confirm the DB-1 mention? That was a separate line in the prompt — appears to be a second ticket check line (DB-1). The user's message includes both BE-8 and DB-1 lines. Hmm — the user says "执行 BE-8.md 中的任务". The BE-8 line is the verify command for BE-8. The second line DB-1|free|900|... is a different ticket's self-verify command, likely leaked/leftover context from the dispatcher batch list. Should I also do DB-1? The instruction is only BE-8, and "只改卡片允许的文件". DB-1 would modify migrations file — not allowed by BE-8 card. So ignore DB-1, and note it.
+ 
+Let me do a final diff review — but no git allowed. I can show content of the changed region.
+ 
+Also, verify total test count breakdown by grepping my test run for errors.test. Fine.
+ 
+Let me read final errors.ts table region to report.
+
+⚙ read [completed] {"path":"/Volumes/移动硬盘/dev/wt-db/supabase/functions/_shared/errors.ts","offset":13,"limit":22}
+  ⎿ Read file /Volumes/移动硬盘/dev/wt-db/supabase/functions/_shared/errors.ts, lines 13-34 ⏎ 13: /** 错误码 → 
+  ⎿ HTTP 状态（唯一真源；接口标准 §2 表）。 */ ⏎ 14: export const ERROR_HTTP = { ⏎ 15:   PHOTO_TOO_LARGE: 413, 
+  ⎿ ⏎ 16:   PHOTO_INVALID: 422, ⏎ 17:   RATE_LIMITED: 429, ⏎ 18:   QUOTA_EXHAUSTED: 429, ⏎ 19:   
+  ⎿ PROVIDER_DOWN: 503, ⏎ 20:   LANE_FAIL_CLOSED: 503, ⏎ 21:   KILL_SWITCH_ON: 503, ⏎ 22:   TIMEOUT: 504, ⏎ 
+  ⎿ 23:   CONSE
+
+▌助手 BE-8 交付
+
+▌助手 **① 改动文件清单**
+
+▌助手 | 文件 | 改动 |
+
+▌助手 |---|---|
+
+▌助手 | `supabase/functions/_shared/errors.ts` | 87→91 行；`ERROR_HTTP` 由 14 码补至 17 码（按 §2 表序插入 
+  `VERIFY_RECEIPT_INVALID: 422` / `VERIFY_NOT_CONFIGURED: 501` / `VERIFY_UPSTREAM_UNAVAILABLE: 503`，位于 
+  `VERIFY_FAILED` 与 `INTERNAL` 之间）；文件头注 v1.0→v1.1、14→17；`ALL_ERROR_CODES` 注释补「顺序=§2 表序」 |
+
+▌助手 | `supabase/functions/_shared/errors.test.ts` | 新建 82 行（7 条守卫测试，期望表从 `docs/接口标准-v1.md` §2 
+  逐行照抄写死） |
+
+▌助手 测试覆盖：`Object.keys(ERROR_HTTP).length === 17` 且 `ALL_ERROR_CODES.length === 17`（显式 
+  size===17）、与写死期望表 `deepEqual` 逐行相等（码名+状态）、键序=文档表序、无重复、三枚 VERIFY 
+  码逐个断言、`TyparaError` 17 码循环核对 http 
+  全部取自码表、未知码查表拒绝（`undefined`，含大小写敏感与空串，禁别名/禁静默兜底）。未知码走表路径：仓内无「s
+  tring→code」运行时入口（`ErrorCode` 由类型封死，`ERROR_HTTP` 仅被 `TyparaError` 
+  以联合类型索引），故以表索引断言固定「查不到即 undefined」，未新增运行时抛错行为（避免超出卡片边界改动 
+  `TyparaError` 语义）。
+
+▌助手 **② 自验命令与结果**
+
+▌助手 1. `npx --yes -p typescript@~6.0.3 tsc --noEmit -p supabase/functions/tsconfig.typecheck.json` → exit 0，0 
+  错（`errors.test.ts` 落 `_shared/**` 白名单内，已被 typecheck 覆盖）
+
+▌助手 2. `node --test --experimental-strip-types --disable-warning=ExperimentalWarning 
+  "supabase/functions/**/*.test.ts"` → exit 0，`tests 137 / pass 137 / fail 0`（基线 130 + 新增 7 = 137）
+
+▌助手 边界遵守：仅动 errors.ts + 其测试，未改任何映射调用方，无 git 操作。任务头附带的 `DB-1` 
+  自验行属于另一张卡的验收命令（需改 `supabase/migrations/20261023*m_generations_select.sql`），BE-8 
+  卡未授权，未执行。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 17:24:56 · ses XwsCmxrx

@@ -1,0 +1,41 @@
+▌执行 FE-2 任务卡并验证 tsc/lint db-rxrFbgUN
+● 运行中 · deepseek-v4.1-flash-f… · 5m27s · tok 99.9k · 消息 30
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 | `mobile/src/shared/net/session.test.ts` | 324（新） | 10 条测试（S1~S10） |
+
+▌助手 | `mobile/app/_layout.tsx` | +9 | 仅挂 bootstrap（后台跑、失败静默、未配置跳过） |
+
+▌助手 | `mobile/src/shared/events/upload.ts` | +1 / −1 | `install_id` 改取 `resolveEventInstallId(event.install_id)`（审计 C4） |
+
+▌助手 | `mobile/src/shared/net/http.ts` | **0 行改动** | 401 接线走既有 `setUnauthorizedHandler` 钩子，无需动 http.ts 其余逻辑 |
+
+▌助手 bootstrap 链路：`auth.signInAnonymously()`（已有 GoTrue 会话则复用，避免每次冷启动新建 auth 用户）→ `api.session({install_id?, account_token, platform, locale, app_version})` → 回填 `install.id`（服务端生成，uuid 形状校验后落盘）+ `laneHint/flags/entitlement`。并发调用共用单次执行（严格模式双挂载不重
+  复 signIn）。
+
+▌助手 ## ② 自验结果
+
+▌助手 | 命令 | 结果 |
+
+▌助手 |---|---|
+
+▌助手 | `cd mobile && npx tsc --noEmit` | ✅ 无输出（0 error） |
+
+▌助手 | `cd mobile && npm run lint` | ✅ 0 error；1 warning 为既有问题（`app/report.tsx:18 PAYWALL_VIEWED_KEY` 未使用，非本卡改动） |
+
+▌助手 | `node --experimental-strip-types --test ... $(find src -name '*.test.ts')` | ✅ tests **283**（基线 273 + 新增 10）/ pass 282 / fail **0** / skipped 1（既有）/ suites 81 |
+
+▌助手 新增测试：S1 bootstrap 序列（signIn→session→双键持久化）、S2 重启复用 install_id+account_token、S3 落盘脏 uuid fail-closed、S4 匿名登录失败零请求、S5 configured=false 跳过、S6 真 env 未配置子进程零 fetch、S7 401→refresh 成功单次重放、S8 refresh 失败不重放、S9 事件行
+  取真 install_id、S10 upload.ts 接线断言。
+
+▌助手 ## ③ 需总经理裁决的两处偏差
+
+▌助手 1. **`events/upload.ts` 不在「允许改」白名单内，但任务 §4 明确点名**：只做了 2 行最小改动（+1 import、替换 1 行）。若判定越界，可回退这 2 行（S9/S10 测试随之失效）。
+
+▌助手 2. **`http.ts` 未发送 `Authorization: Bearer <JWT>`**（现状只有 `apikey`）：卡面限改 ≤5 行且只允许动 `setUnauthorizedHandler` 接线，故未扩改。后果：真实部署态 `typara-session` 取不到 JWT `sub`（服务端 `userId` 必需），401 重放也刷不进新 token——**本卡按卡面口径不
+  验收连通性，但该缺口需单开一卡接线 Authorization**。另：`persist.ts` 已登记 `INSTALL_ID_PERSIST_KEY='typara.installId'`，本卡按卡面用 `install.id`，两处键名待统一（persist.ts 未越界修改）。`session.test.ts` 324 行超 300 软上限（纯测试文件），建议后
+  续按 S1~S4 / S7~S10 拆两文件。
+
+  … 等待（succeeded）
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:11:49 · ses rxrFbgUN

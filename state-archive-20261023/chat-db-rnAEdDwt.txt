@@ -1,0 +1,36 @@
+▌  db-rnAEdDwt
+● 运行中 · mimo-v2.6-flash · 10m51s · tok 80.3k · 消息 33
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 关键判定（回传说明）：证据 S050 实为**底栏内 reselection note**（`sheet.tsx`），非 `setTipKey` 渲染的页内 
+  warning 提示——页内提示未改可点，因 AC-M02-03 
+  规定照片页只此一个可交互控件，改成按钮会新增第二个页面控件；真修点在底栏，P22 即该位置。
+
+▌助手 ## ② 自验命令与逐条结果
+
+▌助手 ```bash
+
+▌助手 cd mobile && npx tsc --noEmit                 # ✅ 0 error
+
+▌助手 cd mobile && npm run lint                      # ✅ 0 error（仅 1 条既有 warning：app/report.tsx:17 
+  PAYWALL_VIEWED_KEY，基线同款）
+
+▌助手 node --experimental-strip-types --test $(find src -name '*.test.ts')   # ✅ tests 253 / pass 252 / skipped 
+  1（既有）/ fail 0
+
+▌助手 ```
+
+▌助手 - 新增测试 4 条（要求 ≥2）全绿：`[01] consent-reselect 真可点（Pressable+button+品牌色下划线+reselect 
+  键）`、`[02] press 序列 = 先 dismiss 后 pickImage 且不先清旧照 + busy 守卫 + onReselect 接线`、`[03] busy 
+  时组件 disabled + 上层传 busy`、`[04] 重开底栏 re_selection=true 且不预勾选（P20 语义）`
+
+▌助手 - 全量 253 ≥ 249+2，零红（基线 249 → 253）
+
+▌助手 - 边界遵守：未改同意五要素/勾选/确认逻辑，未装依赖，未动其他屏；`photo-intro.tsx` 293 行 < 300 软上限
+
+▌助手 **未验证**：真机 P22 装机复测（Picker 实开、连点只开一个）需构建装机，本地只能 tsc/lint/单测三绿。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 16:09:41 · ses rnAEdDwt

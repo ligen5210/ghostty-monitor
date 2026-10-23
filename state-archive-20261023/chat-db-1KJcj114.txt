@@ -1,0 +1,37 @@
+ 执行 mojing IA-4 任务卡  db-1KJcj114 
+● 运行中 · glm-5.3-flash · 2m07s · tok 107.3k · 消息 21
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⎿     1..3 ⏎ ok 157 - [QA7][P2\#6] 客户端版本单点化 ⏎   --- ⏎   duration_ms: 1.42825 ⏎   type: 'suite' ⏎   ... ⏎ 1..157 ⏎ # tests 417 ⏎ # suites 129 
+
+◈ 思考流（最近）
+ 
+Also confirm Icon import used with BENEFIT_ICONS keys; benefit row icon size = sizes['size.icon.md'] = 20 ✅ matches "icon 20".
+ 
+Also "CTA 含 arrow 图标" ✅ trailingIcon="arrow-right".
+ 
+"footnote 一行" — numberOfLines={2}... card says footnote 一行 (one line). Hmm, footnote is numberOfLines={2}. The card's层序 item 7: "footnote 一行（o
+ 
+Actually to be careful: `git show 294bcfe:mobile/app/onboarding/value.tsx | grep -n footnote -A5`.
+
+⚙ shell [completed] git show 294bcfe:mobile/app/onboarding/value.tsx | grep -n "footnote\|numberOfLines" | head
+  ⎿ 127:                    numberOfLines={HERO_MAX_LINES} ⏎ 
+
+⚙ shell [completed] git show 294bcfe:mobile/app/onboarding/value.tsx | grep -n "onboarding.value.footnote" -A 4
+  ⎿ (no output) ⏎ Exited with code 1
+
+⚙ shell [completed] git show 294bcfe:mobile/app/onboarding/value.tsx | grep -n "footnote" 
+  ⎿ (no output) ⏎ Exited with code 1
+
+⚙ shell [completed] git show 294bcfe:mobile/app/onboarding/value.tsx | grep -n "DisclaimerPill\|dot\|Button" | head
+  ⎿ 17:import { DisclaimerPill } from '@/components/ui/DisclaimerPill'; ⏎ 18:import { Button } from '@/components/ui/Button'; ⏎ 35: *   3 点分页指示 + 
+
+◈ 思考流（最近）
+Pre-IA-4 the screen had dots + CTA + disclaimer but no footnote. IA-4 added the footnote with numberOfLines={2}. The card says "footnote 一行". Hmm — t
+ 
+Hmm, let me check the IA 重设计案 §2.1 doc to see the exact spec for footnote.
+
+⚙ shell [completed] ls /Volumes/移动硬盘/dev/wt-db/docs/ 2>/dev/null | grep -i "信息架构\|重设计" ; grep -n "footnote" /Volumes/移动硬盘/dev/wt-db/docs
+  ⎿ grep: /Volumes/移动硬盘/dev/wt-db/docs/UI流程与信息架构重设计案-20261023.md: No such file or directory ⏎ 
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 23:42:13 · ses 1KJcj114

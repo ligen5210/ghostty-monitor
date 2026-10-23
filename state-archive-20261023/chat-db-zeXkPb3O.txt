@@ -1,0 +1,36 @@
+▌执行 M1-FW6 卡片任务 db-zeXkPb3O
+● 运行中 · glm-5.3-flash · 2m40s · tok 53.3k · 消息 15
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 | poll.test.ts ≥3 例 | ✅ 3s 间隔 / 90s 超时转 failed / 卸载停表，全绿 |
+
+▌助手 ## 核对清单（对照 M1-FW6 卡片）
+
+▌助手 1. **`src/features/generation/store.ts`** ✅ zustand vanilla 内存态；`GenerationTask` 
+  类型、`beginUpload`/`uploadSucceeded`/`uploadFailed`/`resetGeneration` 齐全；零 IO、照片字段 reset 即清
+
+▌助手 2. **`photo-intro.tsx`** ✅ 压缩成功处 `setPayload(compressed)` 后同步 `stageGenerationInput(photo, 
+  consent)`（photo+consent 挂上、status 仍 idle）；`advanceAfterConsent` 逻辑未动
+
+▌助手 3. **`quiz.tsx`** ✅ `api.generate` 包装层：从 generationStore 取 photo/consent，构造 §3 
+  契约体（`generation_id`/`lang: i18n.language`/`quiz: 
+  toServerQuiz`/`photo{b64,mime:'image/jpeg',bytes,w,h}`/`consent{version_hash,granted_at}`）；`{ok:true}` 且 
+  l0 存在 → `uploadSucceeded` → push('/generating')；`{ok:false}` → 抛错走 
+  setFailed（草稿保留，不跳转）；photo/consent 缺失 fail-closed 抛 `GENERATION_PAYLOAD_MISSING`
+
+▌助手 4. **`submit.ts`** ✅ git log 确认最后触达为 M1-03b 提交，本卡零改动
+
+▌助手 5. **`generating.tsx`** ✅ 完整状态机：idle/无 generationId → replace('/quiz') 防直连空转；3s 
+  轮询（卸载清理）；悬念轮播每 4s 切换（Text 级，无动画库）；90s 超时按 `startedAt` 补扣（恢复等待不重置）→ 
+  `generating.fail.timeout` + 重试按钮（回 /quiz 保留草稿，不自动重提）；失败即时态走 
+  `generating.fail.network`；done+l0 → replace('/l0')；不做转后台/通知（归 FW7，卡尾已记）
+
+▌助手 6. **i18n（report.ts 只加键）** ✅ 
+  `generating.tease.1/2/3`、`generating.fail.timeout`、`generating.fail.network`（en + zh-Hans 双语各 6 键）
+
+▌助手 7. **边界** ✅ 未装依赖、未碰 net/http.ts、照片未落盘、未做 git 操作、工作区干净（HEAD=runner 代收提交）
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 14:16:45 · ses zeXkPb3O

@@ -1,0 +1,37 @@
+ 执行 QA1.md 任务并遵守项目规则  db-aSWNKUk7 
+● 运行中 · deepseek-v4.1-flash · 8m00s · tok 108.3k · 消息 68
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 $ node --experimental-strip-types --test --disable-warning=ExperimentalWarning $(find src -name '*.test.ts')
+
+▌助手 # tests 365 / # pass 364 / # fail 0 / # skipped 1（与基线同一条 skip；新增 10 条全过）
+
+▌助手 $ grep -q "Authorization" ... && grep -q "installUnauthorizedHandler" ... && grep -q "session_token" ... && echo CHAIN_OK
+
+▌助手 CHAIN_OK
+
+▌助手 $ npx --yes -p typescript@~6.0.3 tsc --noEmit -p supabase/functions/tsconfig.typecheck.json
+
+▌助手 func_tsc_exit=0（无输出）
+
+▌助手 $ node --test --experimental-strip-types --disable-warning=ExperimentalWarning "supabase/functions/**/*.test.ts"
+
+▌助手 # tests 206 / # pass 206 / # fail 0
+
+▌助手 ```
+
+▌助手 基线对照：mobile 基线 355 pass/0 fail（365-10 为新增），functions 基线 205 pass/0 fail（206-1 为新增）→ **双侧 fail 0，全绿
+
+▌助手 ## 备注
+
+▌助手 - 越界情况：无（仅改卡面允许的 8 个文件；未碰 GoTrue 登录方式、17 码表、lane；**未执行任何 git 操作**）。
+
+▌助手 - 文件长度软上限：`mobile/src/shared/net/session.ts` 346 行（>300）。建议后续拆 `net/session-token.ts`（token 端口：shape 
+
+▌助手 - HS256 自验与平台 verify_jwt 信任问题按卡面归 QA4，未在本卡处理。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 19:40:30 · ses aSWNKUk7

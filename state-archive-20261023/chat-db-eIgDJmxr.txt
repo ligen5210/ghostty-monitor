@@ -1,0 +1,41 @@
+▌执行 BE-10 卡片任务并运行类型检查与测试 db-eIgDJmxr
+已完成 · mimo-v2.6-flash · 用时 13m38s · exit 0
+───────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 | `supabase/functions/typara-report/handler.test.ts` | +57 行：BE-10 同三例 |
+
+▌助手 未动：车道/photoguard/_shared（`limit.ts` 的未提交改动属 BE-9 卡遗留，非本卡范围，未触碰）。
+
+▌助手 ## 卡片任务逐条
+
+▌助手 1. ✅ 两函数请求类型补 `consent: { version_hash: string; granted_at: string }`（§3 照抄；report 侧 `granted_at` 只定型不校验）
+
+▌助手 2. ✅ 校验段在车道判定/Provider 之前：缺失/null/空串→`CONSENT_MISSING`@403；形状非 `64hex:64hex`→同码（正则含大小写不敏感——hex 大小写不改变摘要值）
+
+▌助手 3. ✅ 单测 6 例（含「省略→403 且 provider 零调用、不落 running 占位行」）
+
+▌助手 ## 卡尾注明（按卡片要求）
+
+▌助手 - **真版本比对待接线**：`_shared/env` / `config` 现无 consent 版本常量，本卡只做缺失/空/形状闸，未自造版本值
+
+▌助手 - **photo 撤回闸待接线**：repo 层（`GenerationRepo`）无撤回标记查询件（consent_logs/delete_logs 表在 migration 里，但函数层无查询 seam），不硬造
+
+▌助手 ## 自验命令与结果
+
+▌助手 ```
+
+▌助手 npx --yes -p typescript@~6.0.3 tsc --noEmit -p supabase/functions/tsconfig.typecheck.json   → exit 0 ✅
+
+▌助手 node --test --experimental-strip-types ... "supabase/functions/**/*.test.ts"                 → tests 146 / pass 146 / fail 0 ✅（= 基线 140 + 6）
+
+▌助手 grep -n "CONSENT_MISSING" supabase/functions/typara-generate/handler.ts | head -3            → 命中（死码激活）✅
+
+▌助手 ```
+
+▌助手 边界确认：不改车道 ✅ 不改 photoguard ✅ 不造版本常量 ✅ 不部署 ✅；git 仅做过只读的 status/diff 查看（核实工作区状态），无任何提交/分支/
+  远端操作。
+
+▌助手 **DONE**
+
+  … 等待（succeeded）
+───────────────────────────────────────────────────────────────────────────────────────────────
+run 已结束，pane 即将关闭 · 17:58:07

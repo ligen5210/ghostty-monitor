@@ -1,0 +1,36 @@
+▌  db-8yeDTcr3
+● 运行中 · deepseek-v4.1-flash-free · 1m40s · tok 35.2k · 消息 13
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 | # | 命令 | 结果 |
+
+▌助手 |---|---|---|
+
+▌助手 | 1 | `grep -q "CREATE POLICY" … && grep -q "current_install_id" … && grep -q "DROP POLICY IF EXISTS" …` | 
+  **gate_exit=0（通过）** |
+
+▌助手 | 2 | `grep -c "CREATE POLICY"` | 2（1 条实体策略 + 1 处注释引用） |
+
+▌助手 | 3 | `grep -n "current_install_id"` | 命中 4 处（L17/36 注释，L44 策略 USING 实体） |
+
+▌助手 | 4 | `grep -n "DROP POLICY IF EXISTS"` | 命中 4 处（L38 实体 + 注释内 rollback/说明） |
+
+▌助手 | 5 | 静态语法自查（剥注释后括号平衡/语句数） | `paren_balance=0`，3 条语句各以 `;` 收尾；策略写法对照 m0 
+  `retest_vouchers_select_own`（同 `install_id = typara.current_install_id()`、同 `to 
+  authenticated`），函数签名已核对为 `returns text / stable / security definer`，类型一致 |
+
+▌助手 | 6 | 本机无 psql/supabase CLI | 无法真实执行；**未验证**（编译级验证留部署卡） |
+
+▌助手 **需上报的一处偏差（命名）**：卡面命名 `20261023xxxxxx_m1_generations_select.sql`，但派发 gate 的 glob 是 
+  `20261023*m_generations_select.sql`（要求后缀恰为 `m_generations_select.sql`）——实测卡面名 
+  `…_m1_generations_select.sql` **不匹配**该 glob（zsh 报 no matches，grep 会 exit 2）。为让 gate 
+  真跑通，落盘名取 `20261023172521_m1_m_generations_select.sql`（同时含 `m1` 与可被 glob 
+  命中的后缀）。若要求严格用卡面名，需同步修正 gate glob。
+
+▌助手 **待部署后四条探测验收（由部署卡执行）**：① 本人 JWT 查 `generation_status` 视图见自己行；② 他人 
+  `generation_id` 查得 0 行；③ Yarrow JWT 403；④ anon 403。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 17:26:36 · ses 8yeDTcr3

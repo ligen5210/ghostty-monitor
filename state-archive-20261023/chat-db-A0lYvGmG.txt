@@ -1,0 +1,37 @@
+ 复审 S26-CLIENT 客户端 diff 五文件  db-A0lYvGmG 
+● 运行中 · deepseek-v4.1-flash · code-reviewer · 2m09s · tok 57.8k · 消息 21
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 | # | 位置 | 问题 | 严重度 | 修复建议 |
+
+▌助手 |---|---|---|---|---|
+
+▌助手 | 1 | `mobile/src/shared/events/upload.ts:60-64`（`SUBSET_EVENT_NAMES` 加 `consent_pending`）↔ `supabase/migrations/20261022141400_m0_typara_tabl
+  行 → 该 install 后续 `photo_consent_result/quiz_submitted/paywall_viewed/purchase_step` 等全量丢失（直接打穿 kill gate 的安装→7 日净首购判定）。队列
+  前回退该行（事件仅走 Amplitude）。二选一**待总经理拍板**（`supabase/` 不在本卡白名单，Coder 已按边界未改，回传中已自陈） |
+
+▌助手 | 2 | `consent-pending-gate.test.ts:57-76`（`attemptConfirm(state, pending, ...)`） | 测试内复刻 pending 分支，`pending` 是入参而非调用 `isConsen
+  本加一条「pending 分支内不得出现 `enqueueConsentLog`」结构断言 |
+
+▌助手 ### 已核对通过项（逐条）
+
+▌助手 - ① `photo-intro.tsx:180-213`：`handleConfirm` 仅剩 `next === null` 守卫（未勾选/重复确认），占位早退分支已删；pending 分支唯一写库动作是 `enqueu
+
+▌助手 - 安全兜底真实存在（非注释空话）：`supabase/functions/_shared/consent-version.ts:103-107` 无条件拒全零 sentinel + `typara-generate/handler.ts` ⓪ 
+
+▌助手 - ② `events.ts:75-76` 白名单 `consent_pending: []`；`upload.ts` 上送名单已加（constraint 风险见问题 1，Coder 已在原位注释标记）。
+
+▌助手 - ③ 测试真驱动 `confirmConsentSheet/advanceAfterConsent/enqueueEvent/enqueueConsentLog/buildConsentLogPayload`：pending 例断言 前进=true / 台账=0
+
+▌助手 - ④ `consent.version.pending` 在 `report.ts` en+zh 双桶保留，`index.test.ts:266` 的 `EN_ONLY_KEYS` 登记未动。
+
+▌助手 - ⑤ `git diff --name-only` 恰 5 文件，全在白名单内；无 `any` 新增（tsc 严格档 `TSC_EXIT=0`）；无密钥/URL 硬编码。
+
+▌助手 - 自验复核（我本机跑）：`npx tsc --noEmit` = 0；`node --test` = 417 tests / 416 pass / 0 fail / 1 skipped（与 Coder 回传一致，非虚报）。
+
+▌助手 **一句话理由**：功能与验收点全部达标、红线（占位哈希不进台账）在客户端+服务端双层成立，但客户端已按卡上送 `consent_pending` 而 DB check 约束未同
+  退该行的选择**待总经理拍板**后方可放行。
+
+  … 等待（succeeded）
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 22:51:33 · ses A0lYvGmG

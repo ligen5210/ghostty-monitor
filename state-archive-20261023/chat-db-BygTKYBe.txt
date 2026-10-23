@@ -1,0 +1,83 @@
+▌执行 FW-16 任务卡片并验证类型与 lint db-BygTKYBe
+● 运行中 · deepseek-v4.1-flash-f… · 1m35s · tok 40.2k · 消息 23
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ 
+Let me get a diff summary to report file changes with line counts. The worktree is a git repo but we can't do git ops. Hmm "禁止 git 操作" — no git commands. So provide manual counts: app.json +? lines; new test file 108 lines.
+ 
+Let me count lines.
+
+⚙ shell [completed] cd /Volumes/移动硬盘/dev/wt-func && wc -l mobile/app.json mobile/src/navigation/deep-link.test.ts
+  ⎿       73 mobile/app.json ⏎       90 mobile/src/navigation/deep-link.test.ts ⏎      163 total ⏎ 
+
+◈ 思考流（最近）
+app.json went 53 → 73 = +20 lines.
+ 
+Done. Report with file list, verification results, AASA consistency conclusion, and notes on assetlinks placeholders (already known issue, P1 for runtime verify).
+ 
+Also note: android intentFilters only /r per card; AASA lists /privacy /terms → iOS will intercept those too (cold_start). Report as observation, not changed.
+ 
+Output DONE at the end.
+
+▌助手 ## 改动文件清单
+
+▌助手 | 文件 | 行数 | 改动 |
+
+▌助手 |---|---|---|
+
+▌助手 | `mobile/app.json` | 53 → 73（+20） | 新增 `ios.associatedDomains: ["applinks:typara.libot.store"]`；新增 `android.intentFilters`（action=VIEW、autoVerify=true、scheme=https/host=typara.libot.store/**pathPrefix=/r**、category=[BROWSABLE,DEFAULT]）；`scheme: "typara"` 原样保留 |
+
+▌助手 | `mobile/src/navigation/deep-link.test.ts` | 90（新建） | 纯解析测试 6 例（https 短链 / 自定义 scheme / 过门与未过门落点 / 尾斜杠+跟踪参数 / 同域非 /r 不误判） |
+
+▌助手 未新建解析逻辑：`src/navigation/guard.ts` 的 `parseEntryIntent` 已覆盖两形态，按工单“已有则只补测试”执行，guard.ts 零改动。
+
+▌助手 ## 自验结果（逐条）
+
+▌助手 ```bash
+
+▌助手 cd mobile && npx tsc --noEmit && npm run lint
+
+▌助手 ```
+
+▌助手 ✅ tsc 无输出、`eslint .` 无告警（exit 0）。
+
+▌助手 ```bash
+
+▌助手 node --experimental-strip-types --test --disable-warning=ExperimentalWarning $(find src -name '*.test.ts')
+
+▌助手 ```
+
+▌助手 ✅ `# tests 312 / # pass 311 / # fail 0 / # skipped 1`（312 ≥ 306，无红）。唯一 skip 是既有用例 `[AC-M05-02][U2-04b] …（待文案定稿后复跑）`，与本次无关；新增 6 例单独跑：6 pass / 0 fail。
+
+▌助手 ```bash
+
+▌助手 grep -q "applinks:typara.libot.store" app.json && echo ASSOC_OK
+
+▌助手 grep -q "intentFilters" app.json && echo INTENT_OK
+
+▌助手 ```
+
+▌助手 ✅ `ASSOC_OK`、`INTENT_OK`。
+
+▌助手 额外校验（未改任何原生目录）：
+
+▌助手 - `npx expo config --type prebuild --json` ✅ `CONFIG_OK scheme=typara assoc=["applinks:typara.libot.store"] filters=1`（Expo 配置解析通过，prebuild 可读到三节）。
+
+▌助手 - `node -e` 读 app.json 断言三节结构（intentFilters data 仅 1 条、pathPrefix=/r）✅。
+
+▌助手 ## AASA / assetlinks 一致性结论（只核对、未改服务端）
+
+▌助手 - **AASA**：`appID = "TEAMIDXXXX.store.libot.typara"`。Bundle ID 段 `store.libot.typara` 与 `app.json` 的 `ios.bundleIdentifier` **一致**；但 **Team ID 段仍是占位符 `TEAMIDXXXX`**，与真实 Apple Team ID 不一致 → **装机前必须替换为组织真实 TeamID，否则 Universal Link 不生效**（属身份级呈报项，按工单**未改**）。
+
+▌助手 - **assetlinks.json**：`package_name = store.libot.typara` **一致**；但 `sha256_cert_fingerprints` 两枚均为 `placeholder-sha256-fingerprint*` → **Android autoVerify 当前必然失败**，须填真机签名证书 SHA-256（同一份占位清单问题，归 W1/装机 verify2，本次不动服务端）。
+
+▌助手 - 覆盖路径差异（仅记录）：AASA components 含 `/r/*`、`/privacy`、`/terms`，iOS 会把 `/privacy`、`/terms` 也唤进 App；按工单“最小暴露”只给 Android 开了 `/r`。iOS `associatedDomains` 无法按路径收敛，路径收口只能改 AASA（服务端文件，本次禁改）。`/privacy` 进 App 后解析为 `cold_start`（已有测试 DL-06 覆盖），不会白屏。
+
+▌助手 ## 边界确认
+
+▌助手 未改包名、未改 `ios/`|`android/`、未改 `public/.well-known/*`、未做运行时联测、未新增依赖、未执行任何 git 命令。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:36:57 · ses BygTKYBe

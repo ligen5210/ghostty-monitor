@@ -1,0 +1,26 @@
+▌opencode 免费模型列表 db-yBVTWdaQ
+● 运行中 · deepseek-v4.1-flash-f… · 10s · tok 160 · 消息 3
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌用户 "只回复 OK"
+
+▌用户 opencode/deepseek-v4.1-flash-free
+
+▌用户 opencode/glm-5.3-flash-free
+
+▌用户 opencode/mimo-v2.6-flash-free
+
+▌用户 opencode/nemotron-3-ultra-free
+
+▌用户 opencode/flint-40b-free
+
+▌用户 opencode/beam-free
+
+▌用户 opencode/nemotron-3.5-lightning-free
+
+▌用户 opencode/nemotron-3.5-super-vl-free
+
+▌助手 OK
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:38:52 · ses yBVTWdaQ

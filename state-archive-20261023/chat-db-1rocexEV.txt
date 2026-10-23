@@ -1,0 +1,40 @@
+▌FW-11 任务执行与 tsc/lint 校验 db-1rocexEV
+● 运行中 · deepseek-v4.1-flash-f… · 10m35s · tok 194.5k · 消息 75
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 | `mobile/src/features/paywall/exposure.test.ts` | 343 | +3 条（阈值/去重/曝光闸键一致性） |
+
+▌助手 `share_completed` 已于 FW-10 在 `app/share-preview.tsx` 接线（本卡未改该文件）。
+
+▌助手 ## ② 自验（逐条）
+
+▌助手 ```bash
+
+▌助手 cd mobile && npx tsc --noEmit && npm run lint          # 均通过，无输出/无警告
+
+▌助手 node --experimental-strip-types --test ...(find src -name '*.test.ts')
+
+▌助手 # tests 306 / pass 305 / fail 0 / skipped 1（skip 为 M01 既有用例，基线 290→306，新增 16）
+
+▌助手 grep -c "flushEventQueue" app/_layout.tsx              # 3
+
+▌助手 ```
+
+▌助手 覆盖：三触发路径（满 50 条/AppState active/30s 定时）、120 条→50/50/20 切分、install_id 真值替换 unknown、失败不清队列且重试复用 event_uuid、country/excluded_region 裁决、4 事件 props 形状、paywall_viewed 去重与曝光闸。
+
+▌助手 ## ③ 需上报的判断（未自行改范围外文件）
+
+▌助手 1. **DB 只收 14 个 ⚓ 事件名**（`20261022141400_m0_typara_tables.sql` check 约束）：`report_module_opened`/`report_flagged` 不在枚举内，直接入库会让整批失败、队列永不清空。已在 upload.ts 客户端侧过滤（非子集只走 Amplitude、`dropped` 计数）——**服务端未动**。另发现既有 `report_flagged` 也不在 `EVENT_PROP_WHITELIST`（props 被整条剥离），不在本卡"上述 8 事件"范围，未改。
+
+▌助手 2. **country 未用 timeZone 派生**：tz 单独无法映射国家码（需自造 tz→ISO 表＝造假值），故按 locale region 派生、取不到填 `ZZ`+`region_source=client_report`（诚实标注），已在文件头写明。
+
+▌助手 3. **`paywall_viewed` 视口近似**：report.tsx 无滚动探针，`viewportRatio` 取 1（页内全宽区块）+ 1000ms 停留；`l0_first` 放置需改 `app/l0.tsx`（不在允许清单），本卡只接 `report_upsell`。
+
+▌助手 4. **`generation_result` PRD 标注"服务端代发"**，本卡按工单在客户端 done/failed 也发；与 7 号工单/服务端若同时发会翻倍，需总经理确认以哪侧为准（`is_retest/is_regen` 客户端无来源故不写）。
+
+▌助手 5. **文件超软上限**：upload.ts 468 行（>300），建议后续拆 `events/upload.ts`＋`events/region.ts`＋`events/triggers.ts`（拆分需新文件授权，本卡未做）。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:34:47 · ses 1rocexEV

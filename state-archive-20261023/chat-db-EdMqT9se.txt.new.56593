@@ -1,0 +1,19 @@
+▌执行 FIX-I18N1 任务卡 db-EdMqT9se
+● 运行中 · deepseek-v4.1-flash-f… · 51s · tok 22.0k · 消息 9
+──────────────────────────────────────────────────────────
+  ⎿ ，未改动）： ⏎  *   - src/shared/i18n/index.ts 的 EN_TRANSLATION 全键 ⏎  *   - src/shared/i18n/report.ts 的 REPORT_TRANSLATION_EN 全键 ⏎  *   - src/shared/i18n/quiz.ts 的 QUIZ_TRANSLATION_EN 全键 ⏎  *   三处并集 = 146 键（M12 初版 127 + FW-15 补齐 19 键
+  ⎿ ：quiz 复数 _one/_other、 ⏎  *   settings.restore.none/running、settings.language.section/curren
+
+◈ 思考流（最近）
+The en keys must be in a different file. The test builds EN_BUCKET from quiz.ts, report.ts, and extractInlineEntries of index.ts. But grep for "generating." in index.ts gave nothing. Maybe index.ts imports from locales.ts? Let's check locales.ts.
+ 
+Wait, header says keys source = index.ts EN_TRANSLATION. But grep found nothing for "generating." — maybe the keys are nested (nested object structure) e.g. `generating: { prime: {...} }`? But test uses keySeparator: false and flat keys. Hmm, extractInlineEntries extracts depth===1 quoted keys with ':'. So flat keys inside EN_TRANSLATION object.
+ 
+Maybe the grep failed due to encoding? No, grep for "generating." should work. Let me check index.ts structure.
+
+⚙ shell [completed] cd /Volumes/移动硬盘/dev/wt-fix/mobile && grep -n "TRANSLATION" src/shared/i18n/index.ts | head -20 && echo "---" && grep -rn "generating.priming" src/ | head -20
+  ⎿ 21:import { QUIZ_TRANSLATION_EN, QUIZ_TRANSLATION_ZH_HANS } from './quiz.ts'; ⏎ 22:import { REPORT_TRANSLATION_EN, REPORT_TRANSLATION_ZH_HANS } from './report.ts'; ⏎ 24:  ES_TRANSLATION, ⏎ 25:  JA_TRANSLATION, ⏎ 26:  PT_BR_TRANSLATION, ⏎ 27:  DE_TRANSLATION, ⏎ 30:  FR_TRANSLATION, ⏎ 31:  IT_TRANSLATION, ⏎ 32:  KO_TRANSLATION, ⏎ 33:  ID_TRANSLATION, ⏎ 34:  HI_TRANSLATION, ⏎ 35:  SV_TRANSLATION, ⏎ 5
+
+  … 等待（failed）
+──────────────────────────────────────────────────────────
+跟随中 · 19:01:34 · ses EdMqT9se

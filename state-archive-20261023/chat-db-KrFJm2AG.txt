@@ -1,0 +1,37 @@
+ 执行 SEC-2 任务卡  db-KrFJm2AG 
+● 运行中 · deepseek-v4.1-flash · 2m06s · tok 141.5k · 消息 32
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 1..258
+
+▌助手 # tests 258  # pass 258  # fail 0   ← 基线 254 + 新增 4
+
+▌助手 $ node --test ... "supabase/functions/typara-report/*.test.ts" | grep SEC-2
+
+▌助手 ok 23 [SEC-2][B1] report: photoWithdrawn=true → 403 CONSENT_MISSING（provider 零调用）
+
+▌助手 ok 24 [SEC-2][B1] report: photoWithdrawn 缺省/false → 正常放行（不误伤）
+
+▌助手 ok 36 [SEC-2][B1] 入口接线：photoWithdrawn=true → 403 CONSENT_MISSING 且 provider 零调用
+
+▌助手 ok 37 [SEC-2][B1] 入口接线：photoWithdrawn=false → 正常放行（不误伤）
+
+▌助手 # tests 39  # pass 39  # fail 0
+
+▌助手 $ grep -c "photoWithdrawn" supabase/functions/typara-report/index.ts supabase/functions/typara-report/handler.ts
+
+▌助手 index.ts:4
+
+▌助手 handler.ts:3
+
+▌助手 ```
+
+▌助手 边界遵守：只动上述 4 个文件；未碰 lane、consent 形状闸、`deps.ts`；未执行任何 git 命令。卡片文件 `tickets/SEC-2.md` 位于主
+  而非写入卡尾。
+
+▌助手 **已验证**（typecheck 0 错 + 258/258 全绿 + 新增 4 例）。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 20:23:45 · ses KrFJm2AG

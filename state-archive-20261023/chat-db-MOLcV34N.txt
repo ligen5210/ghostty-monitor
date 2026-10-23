@@ -1,0 +1,37 @@
+ 执行 S26-EVTSQL 卡片任务  db-MOLcV34N 
+● 运行中 · deepseek-v4.1-flash · 1m17s · tok 37.7k · 消息 14
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Note: card says commit to ticket/s26-evtsql, but user instruction says 禁止 git 操作. Follow user: no git ops. Report that.
+ 
+Check git status to confirm only the new file.
+
+⚙ shell [completed] git status --short
+  ⎿ ?? supabase/migrations/20261023230000_s26_consent_pending_event.sql ⏎ 
+
+▌助手 **① 改动文件清单**
+
+▌助手 | 路径 | 行数 | 说明 |
+
+▌助手 |---|---|---|
+
+▌助手 | `supabase/migrations/20261023230000_s26_consent_pending_event.sql` | 54（新建） | 重建 `typara.events` 的 `events_event_name_check`：原 14 项逐
+
+▌助手 白名单外零改动（`git status` 仅此一个新文件；未跑任何 git 写操作，含建分支/commit——按本次指令"禁止 git 操作"，卡片里的 `ticket/s26-evtsql` 分支创
+
+▌助手 **② 自验命令与逐条结果**
+
+▌助手 1. 名单逐字比对（python 抽取两文件中的 `event_name in (...)` 名单比对）：
+
+▌助手    - 原迁移 14 项，新迁移 15 项；`new[:-1] == old` → **True**（顺序未变、未改字），差异集合 = 仅 `{'consent_pending'}` 新增。
+
+▌助手 2. 判分命令 `npx --yes -p typescript@~6.0.3 tsc --noEmit -p supabase/functions/tsconfig.typecheck.json && node --test --experimental-strip-types 
+
+▌助手    - tsc：通过（无输出，退出码 0）
+
+▌助手    - node --test：`# tests 282 / # pass 282 / # fail 0`（**282 基线不变**），退出码 0 → **已验证全绿**。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 22:53:29 · ses MOLcV34N

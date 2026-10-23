@@ -1,0 +1,37 @@
+ 执行SEC-1b任务卡  db-xqOtAM4W 
+● 运行中 · deepseek-v4.1-flash · 6m58s · tok 129.1k · 消息 57
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 | `mobile/src/shared/stores/install.test.ts` | 133 | 新增：强随机源、uuid v4 位、无强随机 fail-closed、account_token/dns 权
+
+▌助手 未装依赖、未碰 `functions/`、未动 `ios/`/`android/`、无 git 操作。
+
+▌助手 ## ② 自验命令与逐条结果
+
+▌助手 ```
+
+▌助手 cd mobile && npx tsc --noEmit            → 通过（无输出）
+
+▌助手 cd mobile && npm run lint                → 通过（eslint 无告警）
+
+▌助手 node --experimental-strip-types --test --disable-warning=ExperimentalWarning $(find src -name '*.test.ts')
+
+▌助手   → tests 409 / pass 408 / fail 0 / skipped 1（基线 403/fail 0，新增 6 条全绿）
+
+▌助手 grep -rn "session_token" src/shared/net/session.ts src/shared/net/http.ts | grep -v "account_token\|//"
+
+▌助手   → 无命中（HS256_CLIENT_RETIRED；`x-typara-session-token` 全仓 mobile 已 0 命中）
+
+▌助手 grep -c "dns_opt_out" src/shared/net/session.ts → 6
+
+▌助手 ```
+
+▌助手 新增/改写覆盖：Bearer=GoTrue token、无 token 零请求 `INTERNAL@0`、session 三键持久化、脏值不覆盖、401 刷新重放取新 token、i
+
+▌助手 备注（非阻塞）：`http.ts`(354)/`session.ts`(419) 超单文件 300 行软上限（改前即 343/456，本次已净减），建议后续拆 `session.c
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 20:29:58 · ses xqOtAM4W

@@ -1,0 +1,36 @@
+▌  db-D9au59Sl
+● 运行中 · mimo-v2.6-flash · 20m14s · tok 246.8k · 消息 57
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 |---|---|---|
+
+▌助手 | M1-FE1 | `tsc --noEmit -p mobile` + `node --test mobile/src/shared/net/http.test.ts` | ✅ tsc 0 错；15/15 
+  pass |
+
+▌助手 | M1-FW5 | `tsc` + 双 `grep -q "push('/settings')"` | ✅ GEAR_OK |
+
+▌助手 | M1-FW6 | `tsc` + `node --test $(find mobile/src -name '*.test.ts')` | ✅ **249 tests / 248 pass / 0 fail / 
+  1 skip**（skip 为基线既有） |
+
+▌助手 | 附加 | `eslint` 全部改动文件 | ✅ 0 新增问题（report.tsx 2 错 1 警为本卡范围外既有代码） |
+
+▌助手 ### ③ 需上报的偏差与欠账
+
+▌助手 1. **环境修复（卡外）**：仓库根 `npx tsc` 会误装废弃包 `tsc@2.0.4`，实跑用 
+  `mobile/node_modules/.bin/tsc`（同一编译器）；另发现 `expo-image-manipulator` 在 package.json 但 
+  node_modules 缺失，已 `npm install --no-save` 补装（package.json/lockfile **零改动**）。
+
+▌助手 2. **i18n 多加一键**：卡面只列 5 键，但卡面又强制"重试按钮"——无标签键无法落地，补了 `generating.retry`（en 
+  `Try again` / zh `再试一次`），请经理追认。
+
+▌助手 3. **文件超软上限（300 行）**：`quiz.tsx` 382 行（本卡 +38）、`http.test.ts` 302 行。建议后续工单拆 quiz 
+  提交逻辑为 `useQuizSubmit` hook。
+
+▌助手 4. **已知限制（按卡记录）**：杀进程后生成任务丢失（内存态照片铁律，不做持久化恢复）；转后台/本地通知归 
+  M1-FW7。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 14:06:57 · ses D9au59Sl

@@ -45,14 +45,36 @@ if [[ -f $PIDFILE ]]; then
 fi
 echo $$ > "$PIDFILE"
 
-cleanup() { [[ $(cat "$PIDFILE" 2>/dev/null) == $$ ]] && rm -f "$PIDFILE"; }
+# 全局互斥：同一台机器只允许一个 monitor（跨 GM_HOME 接管，防止 /tmp 测试残留抢面板）
+GLOCK="$GM_ROOT/state/monitor.global"
+takeover_globals() {
+  if [[ -f $GLOCK ]]; then
+    local gp ghome
+    IFS=$'\t' read -r gp ghome < "$GLOCK" 2>/dev/null || true
+    if gm_alive "$gp" && gm_is_cmd "$gp" "bin/monitor" && [[ $gp != $$ ]]; then
+      if [[ $ghome == "$GM_HOME" ]]; then
+        echo "monitor 已在运行（pid ${gp}，home ${ghome:-?}）" >&2
+        exit 1
+      fi
+      echo "接管：终止其它 home 的 monitor（pid ${gp}，home ${ghome:-?}）" >&2
+      kill -TERM "$gp" 2>/dev/null; sleep 1; kill -9 "$gp" 2>/dev/null
+    fi
+  fi
+  printf '%s\t%s\n' "$$" "$GM_HOME" | gm_atomic_write "$GLOCK"
+}
+takeover_globals
+
+cleanup() {
+  [[ $(cat "$PIDFILE" 2>/dev/null) == $$ ]] && rm -f "$PIDFILE"
+  [[ $(cat "$GLOCK" 2>/dev/null | cut -f1) == $$ ]] && rm -f "$GLOCK"
+}
 trap cleanup EXIT
 trap 'log "收到 TERM/INT，退出"; exit 0' TERM INT
 
 # ---------- AppleScript ----------
 AS_ERR="$GM_LOGS/applescript.err"
 
-as_list() {
+_as_list_once() {
   osascript - 2>>"$AS_ERR" <<'AS'
 on run argv
   tell application "Ghostty"
@@ -68,6 +90,17 @@ on run argv
   end tell
 end run
 AS
+  printf '%s' "$out"
+}
+as_list() {
+  local out
+  out=$(_as_list_once)
+  # 枚举偶发失败/空输出：立即重试一次（P2）
+  if [[ -z $out ]]; then
+    sleep 0.5
+    out=$(_as_list_once)
+  fi
+  printf '%s' "$out"
 }
 
 as_new_window() { # cmd env... fontsize（最后一个不含 = 的参数）
@@ -386,19 +419,41 @@ reconcile() {
 
   # 1) 监控窗口校验
   # 用量 pane 心跳：size-usage.txt 超 8 秒没更新 = 进程挂了 → 重建
+  # 新建面板 30 秒冷启动宽限 + 丢失判定需连续 10 秒成立（防抖，2026-10-23 修复）：
+  # AppleScript 枚举在重建瞬间/高负载下会偶发漏看窗口，直接重建会陷入死循环
   local uage=$(( $(gm_now) - $(gm_mtime "$GM_STATE/size-usage.txt") ))
+  local dage=$(( $(gm_now) - ${DCREATED:-0} ))
+  local dash_bad=0
   if [[ -z $DWID ]] || ! is_live_window "$DWID" || ! is_live_term "$DTERM" \
-     || [[ $(term_window "$DTERM") != "$DWID" ]] || (( uage > 8 )); then
-    if [[ -n $DWID ]] && is_live_window "$DWID"; then
-      log "用量 pane 丢失，重建监控窗口（旧 window=${DWID}）"
-      close_grid
-      as_close_window "$DWID"
-    else
-      log "监控窗口不存在，新建"
+     || [[ $(term_window "$DTERM") != "$DWID" ]] || (( uage > 8 && dage > 30 )); then
+    dash_bad=1
+  fi
+  if (( dash_bad )); then
+    local nowv2; nowv2=$(gm_now)
+    local dmiss="$GM_STATE/dash-missing"
+    local dsince; dsince=$(cat "$dmiss" 2>/dev/null || true)
+    if [[ -z $dsince ]]; then
+      printf '%s' "$nowv2" | gm_atomic_write "$dmiss"
+      return 0            # 第一次看到丢失：只记录，下轮再确认
     fi
+    if (( nowv2 - dsince < 10 )); then
+      return 0            # 丢失未持续 10 秒：等下轮
+    fi
+    rm -f "$dmiss"
+    local OWID=$DWID had_window=0
+    [[ -n $OWID ]] && is_live_window "$OWID" && had_window=1
+    # 先建新面板再关旧的：Ghostty 在 0 窗口瞬间会自动补开一个默认 ~ 窗口（事故根因）
     create_dashboard || return 1
+    touch "$GM_STATE/size-usage.txt" 2>/dev/null || true   # 种一颗心跳，给新面板追赶窗口
+    close_grid                                             # 关旧对话格
+    if (( had_window )); then
+      as_close_window "$OWID"
+      log "旧监控窗口已由新面板接替（${OWID} → ${DWID}）"
+    fi
     : > "$GRID"
     rm -f "$SIGF"
+  else
+    rm -f "$GM_STATE/dash-missing" 2>/dev/null || true
   fi
 
   # 2) 活跃 run（按 started）→ 取前 MAX 个上墙
@@ -423,6 +478,8 @@ reconcile() {
     { echo "DBG sid=[$sid] dir=[$dir] model=[$model] created=[$created] updated=[$updated]"; } >> /tmp/dbloop.log
     [[ -n $sid ]] || continue
     case "$bound" in *" $sid "*) continue ;; esac
+    # 防抖：会话创建不足 10 秒不上屏（探活风暴 3 秒级会话直接忽略）
+    if (( nowv * 1000 - created < 10000 )); then continue; fi
     s8="db-${sid: -8}"
     rf="$GM_RUNS/$s8.json"
     if [[ ! -f $rf ]]; then

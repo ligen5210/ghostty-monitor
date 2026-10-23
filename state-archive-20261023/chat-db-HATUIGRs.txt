@@ -1,0 +1,40 @@
+▌执行 UX-D 卡片任务并验证 tsc 与 lint db-HATUIGRs
+● 运行中 · mimo-v2.6-flash · 35m15s · tok 237.5k · 消息 57
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 |---|---|
+
+▌助手 | `mobile/app/quiz.tsx` | 420 行（+69/-53）。顶栏返回改 Ghost 规格（chevron-right 旋转 180° 充当 chevron-left，图标集无 left 档）+ 计数 `3 / 5` 换 `caption.lg` + tabular-nums；bonus Skip 改 Secondary 规格（透明底 + border.strong，跳过后 hairline 边 + disabled.ink 字）；footer 边线换 `border.hairline`、hint/错误文案换 `caption.lg` 字阶；**Submit 换 ui/Button Primary**（未答满自动 `button.disabled.*`，带 arrow-right 尾标 + submitting loading 态） |
+
+▌助手 | `mobile/src/components/QuizCard.tsx` | 79 行。题卡换 ui/Card（card.base：hairline 0 阴影）+ 内距 24；题干升 `title.lg` 24/700 tracking.tight（typeStyle 走 locale 行高） |
+
+▌助手 | `mobile/src/components/QuizOptionRow.tsx` | 118 行。行高 52→`size.row` 56；未选描边 `border.default`→`border.hairline`；label 换 `body.lg` typeStyle；28×28 圆形字母徽标保留 A/B/C/D（未选 hairline+secondary，选中 brand.primary 填充白字）；label `flex:1 + minWidth:0` 弹性换行（de/ru 长文本不破版，选项是答题依据禁省略截断） |
+
+▌助手 | `mobile/src/components/QuizProgressBar.tsx` | 74 行。段高 8→6、去外框 overflow、gap 对齐 §3.5；当前段 `brand.pressed`→`brand.soft`、未答 `border.default`→`border.hairline` |
+
+▌助手 **交互语义零改动**：seed 乱序/草稿三键/submitHint/canSubmit/必答置灰/Skip 点亮进度段/失败停留重试全部原样，逻辑函数一行未碰。未按 §4.5 加「必答/加分」eyebrow——需新增 i18n key，超出本卡放行文件范围（红线 6 要求同步 12 语 locale 表），已在组件注释中标注欠账。
+
+▌助手 **验证过的取舍**：进度条未直接换用 ui/ProgressSegments——该组件按下标着色，回退到已答题会把已答段变灰、末题 Skip 不点亮本段，与 M1-FIX2 P31b（S069/S070）守门冲突；本卡让 QuizProgressBar 视觉对齐 §3.5 规格、保留 answeredFlags 语义。
+
+▌助手 ## ② 自验命令与结果
+
+▌助手 ```
+
+▌助手 npx tsc --noEmit                      → 0 错误
+
+▌助手 npm run lint                          → 0 错误（report.tsx 1 条既有 warning，非本卡文件）
+
+▌助手 node --test src/**/*.test.ts          → 282 tests / 281 pass / 0 fail / 1 skipped（M05 文案定稿前既有 SKIP）
+
+▌助手 node scripts/grade/m03.mjs            → 40 条：PASS 29 / FAIL 0 / BLOCKED 11（全部为设备阶段占位，与改造前同底）
+
+▌助手 ```
+
+▌助手 quiz.test / draft.test / i18n quiz.test（含 `t(hint.key, { count })`、Skip disabled 态、skippedIds 点亮进度段三条静态扫描）全绿。截图待装机补拍。
+
+▌助手 **已验证**。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:25:38 · ses HATUIGRs

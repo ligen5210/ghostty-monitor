@@ -73,16 +73,37 @@ cmd_stop() {
   else
     echo "monitor 未运行"
   fi
-  if (( keep == 0 )) && [[ -f $DASH ]]; then
-    local dwid
-    IFS=$'\t' read -r dwid _ _ < "$DASH" 2>/dev/null || true
-    if [[ -n ${dwid:-} ]]; then
-      as_close_window "$dwid"
-      echo "监控窗口已关闭"
-    fi
-    rm -f "$DASH"
+  # 全量回收：关闭所有本工具的遗留窗口（按窗口内终端名识别，不只当前 dashboard）
+  osascript - 2>/dev/null <<'AS' >/dev/null
+on run argv
+  tell application "Ghostty"
+    set doomed to {}
+    repeat with w in windows
+      set mine to false
+      repeat with t in terminals of w
+        set n to (name of t)
+        if n contains "Ghostty Monitor" or n contains "空闲槽位" or n contains "· 对话" then
+          set mine to true
+          exit repeat
+        end if
+      end repeat
+      if mine then set end of doomed to (id of w)
+    end repeat
+    repeat with wid in doomed
+      try
+        close window (window id wid)
+      end try
+    end repeat
+    return count of doomed
+  end tell
+end run
+AS
+  # 兜底：按脚本路径清理任何残留的监控族进程（相对/绝对路径启动都覆盖）
+  pkill -TERM -f 'ghostty-monitor/bin/(monitor|usage-pane|pane-watcher|slot-pane)' 2>/dev/null || true
+  if (( keep == 0 )); then
+    rm -f "$DASH" "$GM_STATE/layout.sig"
   fi
-  rm -f "$PIDFILE"
+  rm -f "$PIDFILE" "$GM_ROOT/state/monitor.global"
 }
 
 cmd_status() {

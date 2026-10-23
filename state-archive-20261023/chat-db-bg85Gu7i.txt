@@ -1,0 +1,37 @@
+ 执行 SEC-1a 工单任务  db-bg85Gu7i 
+● 运行中 · deepseek-v4.1-flash · 10m37s · tok 199.4k · 消息 93
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 ls supabase/config.toml && grep -c "verify_jwt" supabase/config.toml
+
+▌助手 # → 11（实际条目 9 条：^verify_jwt=9，另 2 处为说明性注释）
+
+▌助手 npx --yes -p typescript@~6.0.3 tsc --noEmit -p supabase/functions/tsconfig.typecheck.json
+
+▌助手 # → TSC_EXIT=0
+
+▌助手 node --test --experimental-strip-types --disable-warning=ExperimentalWarning "supabase/functions/**/*.test.ts"
+
+▌助手 # → # tests 260 / # pass 260 / # fail 0（基线 254 全过，净增 6）
+
+▌助手 grep -rn "signSessionToken|x-typara-session-token" supabase/functions/typara-session/index.ts
+
+▌助手 # → HS256_RETIRED
+
+▌助手 grep -rn "Bearer <SECRET>|Bearer ${" supabase/functions/typara-quota/index.ts supabase/functions/typara-reconcile/index.ts
+
+▌助手 # → 无输出（NO_BEARER_SECRET）
+
+▌助手 ```
+
+▌助手 **部署提醒（卡尾口径）**：`supabase secrets set CRON_SECRET=<值>`（quota/reconcile 共用）；部署后跑 `config.toml` 文件头的
+
+▌助手 **未做/边界**：客户端文件（SEC-1b）、lane/错误码表、项目 JWT secret 均未碰；禁 git 已遵守。
+
+▌助手 **拆分建议**：`_shared/jwt.ts` 451 行、`typara-session/handler.test.ts` 480 行、`typara-generate/index.ts` 424 行超 300 软
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 20:32:17 · ses bg85Gu7i

@@ -1,0 +1,37 @@
+ 执行 IA-9 任务卡片  db-N2k4UnjF 
+● 运行中 · glm-5.3-flash · 2m09s · tok 120.9k · 消息 14
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 | 2 | `mobile/src/components/report/ReportHeader.tsx` | ✅ `paddingTop: space['space.4']`(16)，
+
+▌助手 | 3 | `mobile/app/share-preview.tsx` | ✅ 卡宽=min(内容宽, (可用高−控制区实测高)÷画布高倍率)；
+
+▌助手 | 4 | `mobile/app/onboarding/value.tsx` / `mobile/app/l0.tsx` | ✅ 条件项：两页均 `SafeScreen t
+
+▌助手 | 5 | `mobile/app/underage-exit.tsx` | ✅ `bottom: insets.bottom + space['space.8']`（≤3 行） |
+
+▌助手 | 6 | `mobile/app/quiz.tsx` | ✅ `contentContainerStyle paddingBottom: space['space.6']` |
+
+▌助手 ## ② 自验（`cd mobile && npx tsc --noEmit && npm run lint && node --test`）
+
+▌助手 - `npm run lint` — **✅ 通过（0 error / 0 warning）**
+
+▌助手 - `node --test` — **✅ 通过：417 测 416 过 / 0 fail / 1 skip**
+
+▌助手 - `npx tsc --noEmit` — **❌ 未通过（已验证，卡点如下）**
+
+▌助手 ```
+
+▌助手 app/generating.tsx(435,24): error TS2339: Property 'container' does not exist on type {...}
+
+▌助手 ```
+
+▌助手 **卡点定位（如实上报）**：该错误与 IA-9 无关——IA-9 提交 `2811eb5` 只改了白名单 7 文件；`genera
+  只有 `containerSafe`，同一错误在 IA-8 合并提交 `2e54a2d` 中即已存在，"GM 复跑 417 测 0 红"当时未跑
+  文件」纪律我未修复。一行级修复建议交 IA-8 侧/经理派卡：`generating.tsx:435` `styles.container` → `
+
+▌助手 DONE
+
+  … 等待（succeeded）
+────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 23:36:54 · ses N2k4UnjF

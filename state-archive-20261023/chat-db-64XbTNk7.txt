@@ -1,0 +1,40 @@
+▌执行 BE-3 卡片任务 db-64XbTNk7
+已完成 · mimo-v2.6-flash · 用时 19m12s · exit 0
+───────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 ### ② 自验命令与逐条结果
+
+▌助手 ```bash
+
+▌助手 npx --yes -p typescript@~6.0.3 tsc --noEmit -p supabase/functions/tsconfig.typecheck.json
+
+▌助手 # → tsc_exit=0（0 错；含新登记的 typara-session 三文件）
+
+▌助手 node --test --experimental-strip-types --disable-warning=ExperimentalWarning "supabase/functions/**/*.test.ts"
+
+▌助手 # → tests 142 / pass 142 / fail 0（基线 130 → 新增 12 全绿）
+
+▌助手 ```
+
+▌助手 新增 12 用例逐条：建行生成 uuid v4 ✅ / 复用客户端 install_id ✅ / 非法形状 400+repo 零调用 ✅ / 缺字段逐个 400 ✅ / platform 非法 400 ✅ / lane_hint 三分支 ✅ / flags 透传 ✅ / quota_state 三分支 ✅ / entitlement 摘要形状 ✅ / vouchers 四态派生 ✅ / 200 
+  恰 4 键 ✅ / **signSessionToken → parseSessionClaims 回读双 claim 一致** ✅（卡片要求的 ≥5 项全覆盖）。
+
+▌助手 边界自核：未部署、未碰 migrations、未改其他函数（lane.ts/errors-map.ts 仅 import 复用）、零 git、零新依赖、entitlements/retest_vouchers 全程只读。
+
+▌助手 ### ③ 卡尾注明（待总经理/QA 裁决三项）
+
+▌助手 1. **`INVALID_REQUEST` 未注册**：卡片要求「缺字段 400」，但接口标准 §2 封闭码表无 400 档——临时用字面量 `INVALID_REQUEST@400` 承载（handler.ts 文件头有注），注册需三处
+  同步（接口标准+PRD+话术矩阵）超出本卡范围，**上报待裁决**。
+
+▌助手 2. **TODO(接线) quota_state**：`countTodayCalls` 语义已复用（阈值=`_shared/limit.ts` DAILY_L0_LIMIT=3）做成可选注入 dep，但接线需 rest 层暴露 PostgREST `Content-Range`（generations 当日成功 L0 计数），本卡范围外——未接线时 quota_state 恒 `'ok'`。
+
+▌助手 3. **签发侧为过渡实现（与 jwt.ts 对齐待 QA 核）**：本地 HS256（env `SESSION_SIGNING_SECRET`，缺失 fail-closed 500），token 经响应头 `x-typara-session-token` 下发（响应体保契约恰 4 键）；正式 M1-05 路径=GoTrue app_metadata 写
+  入+客户端 refreshSession。
+
+▌助手 另：handler.ts 348 行超单文件 300 行软上限（注释占比高）——建议下次迭代把 `signSessionToken`+base64url 工具拆 `sign.ts`（本次受「新建三文件」清单约束未拆）
+  。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+───────────────────────────────────────────────────────────────────────────────────────────────
+run 已结束，pane 即将关闭 · 17:57:41

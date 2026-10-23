@@ -1,0 +1,36 @@
+▌  db-S3PZKnL3
+● 运行中 · mimo-v2.6-flash · 24m14s · tok 202.6k · 消息 75
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 附跑：node scripts/grade/m03.mjs → FAIL 0（PASS 29 / BLOCKED 11，与基线一致）
+
+▌助手      node scripts/ci/test/**、check_banned_words → 命中 5 处全为存量注释，本卡文件零命中
+
+▌助手 ```
+
+▌助手 ## 需要经理知悉的 4 条偏差/欠账
+
+▌助手 1. **键名未用 `quiz.left_one/left_other`**：`hint.key` 字面量契约在 
+  `src/features/quiz/quiz.ts`（不在允许改清单），m03 判分器也断言 en 桶含 `quiz.hint.remaining` → 改为在既有 
+  base 键上挂 i18next 复数后缀 `_one/_other`（传 `{count}` 时 i18next 
+  自动解析），端上文案与工单要求逐字一致（已实测）。**此为来自本仓库判分器约束的取舍**。
+
+▌助手 2. **10 语 `{email}` 仍泄漏**：`locales-ext-a/b`（es/pt-BR/fr/de/it/ja/ko/id/hi/sv）的 
+  `report.support.email` 仍是单花括号，且不在本卡允许改清单 → 非 en/zh 语言仍会显示字面 `{email}`。需 
+  FW15/后续卡一并补（同时补 en 新增的 2 个复数键：m12 键集判分本就红，本卡使 10 语缺键 15→17、zh 
+  0→2，属同一欠账）。
+
+▌助手 3. **"多余右括号"当前源码零命中**：en/zh 两个键值与 `report.tsx` 渲染行均无 `)`（证据图 S116/S118 OCR 
+  实测确为 `Support: {email})`）→ 判定为证据构建包早于源码改动的旧包残留，本卡修复后重打包应渲染 `Support: 
+  yifei4trade@gmail.com`；若复验仍带 `)`，请给该次出包的 report 源码版本供追查。
+
+▌助手 4. **Skip 反馈实现方式**：按"按钮态变化"最小修——进度段点亮 + 按钮置灰 `disabled`，未引 
+  Toast/新文案键（不引新依赖、不再增键集差、草稿三键铁律不动）。另：`mobile/app/quiz.tsx` 已 401 行超 300 
+  软上限（基线 382），建议后续把 footer/跳过态抽 hook 或子组件（本卡未顺手重构）。同 worktree 有并行卡在改 
+  `settings.tsx`/`report.ts`，上表结果为当前合并态复跑值。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 16:33:56 · ses S3PZKnL3

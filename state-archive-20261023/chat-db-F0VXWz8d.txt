@@ -1,0 +1,37 @@
+ 执行 QA6.md 任务：tsc 与 lint 校验  db-F0VXWz8d 
+已完成 · deepseek-v4.1-fla… · 用时 22m40s · exit 0
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 [1] cd mobile && npx tsc --noEmit                          → 0 错误
+
+▌助手 [2] npm run lint                                           → 0 问题（eslint .）
+
+▌助手 [3] node --experimental-strip-types --test … src/**/*.test.ts
+
+▌助手       → tests 392 / pass 391 / fail 0 / skipped 1（跳过为基线既有）
+
+▌助手 [4] npx -p typescript@~6.0.3 tsc -p supabase/functions/tsconfig.typecheck.json → 0 错误
+
+▌助手 [5] node --test … "supabase/functions/**/*.test.ts"        → tests 237 / pass 237 / fail 0
+
+▌助手 [6] grep -c "install-demo-0001" mobile/app/share-preview.tsx → 0（REAL_ID）
+
+▌助手 [7] grep "success" supabase/functions/_shared/limit.ts     → 115/133/144 行均为成功过滤口径
+
+▌助手 附：判分器 node scripts/grade/m01|m02|m05 → m01 14/14、m05 10/10、m02 48 PASS（唯一 FAIL=AC-M02-01-S4，因 generating.tsx 通
+
+▌助手 ```
+
+▌助手 ## ④ 需知情事项
+
+▌助手 - `mobile/src/shared/i18n/index.test.ts` 的 10 语 strict diff 增加**逐条登记**的 `EN_ONLY_KEYS`（`consent.version.pending`
+
+▌助手 - 行数超软上限 300（多为既有超标 + 本卡增量）：`quality.ts 385`（建议拆 `quality-proxy.ts`）、`report.tsx 447`（建议拆 `fea
+
+▌助手 - 未做任何 git 操作；期间仓库出现提交 `4e1046d feat(QA6): runner 代收…` 系外部 runner 代收，非本会话执行（本会话最终还有 2 
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+run 已结束，pane 即将关闭 · 20:12:45

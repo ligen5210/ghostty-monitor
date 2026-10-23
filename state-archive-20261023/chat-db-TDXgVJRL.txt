@@ -1,0 +1,40 @@
+▌执行 UX-H.md 任务卡片 db-TDXgVJRL
+● 运行中 · deepseek-v4.1-flash · 8m22s · tok 158.2k · 消息 58
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 | `mobile/src/components/share/ShareCardCanvas.tsx` | 349 | 新增（显式 cardPalette 画布 + 双卡分层卡体 + 水印行） |
+
+▌助手 | `mobile/src/components/settings/SettingsGroup.tsx` | 207 | 新增（组卡 + 行：无 accessory 复用 ListRow，有 Switch/spinner 走同 tokens 复刻） |
+
+▌助手 | `mobile/src/components/settings/LanguagePickerSheet.tsx` | 114 | 新增（Sheet 单选：本地自称/locale 排序/✓ 当前行） |
+
+▌助手 未改：i18n 资源桶、语言持久化、age-gate/consent、导出链路、任何测试文件（既有测试无需适配）。
+
+▌助手 ## ② 自验命令与逐条结果
+
+▌助手 - `npx tsc --noEmit` → **exit 0**，零错误
+
+▌助手 - `npm run lint` → **0 errors**，1 warning（`app/report.tsx:20 PAYWALL_VIEWED_KEY` 未使用，UX-G 遗留、非本卡改动）
+
+▌助手 - `node --experimental-strip-types --test ... $(find src -name '*.test.ts')` → **282 tests / 281 pass / 0 fail / 1 skipped**（与改前基线完全一致；`features/settings/language.test.ts` 绿）
+
+▌助手 - 附加（相关判分器重跑）：`node scripts/grade/m07.mjs` → **10/10 PASS**（S4 显式主题、S8 `shareEligible(paywallViewedAt)`、S9 用例数等全绿）；`node scripts/grade/m01.mjs` → 13/14，S12 FAIL 仅命中 `src/features/share/cards.ts`、`src/features/report/report-share.test.ts` 两个**本卡未改动且不在允许范围**的文件（改前即存在，非本次引入；S13 数据权利 SLA、S6 年龄门读取单点仍绿）
+
+▌助手 ## ③ 说明（不阻塞验收）
+
+▌助手 1. **M-UX-03/04 分享卡底纹未交付**（在 M16 素材单），画布未加底纹图层、也**没放占位图**（避免导出带脏底），素材到位后加一层 `Image` 即可（bottom 1/3 已留净空）。
+
+▌助手 2. 锁定词 **blur 2px** 无原生滤镜（禁加依赖），以 `placeholder.blur` 底 + lock 图标双编码实现（D5 不靠颜色单编码），语义与真实词零下发不变。
+
+▌助手 3. 分段控件组标题 `TYPE/RATIO/THEME` 与 `Light/Dark` 属技术标识：i18n 资源桶不在本卡允许改动范围内，未新增 key（补 key 后直接换 `t()`）。
+
+▌助手 4. 导出/复制链接按工单边界**只落视觉 + eligibility 门禁**（未购墙未曝光时禁用），点击无副作用，交 M1-FW10。
+
+▌助手 5. `ShareCardCanvas.tsx` 349 行 > 300 软上限：建议后续把 `cardPalette`/`canvasAspect` 拆到 `src/features/share/card-palette.ts`。
+
+▌助手 6. 截图待装机补拍（8 组合 × 亮/暗、设置首屏亮/暗、冷启动首帧）。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:46:45 · ses TDXgVJRL

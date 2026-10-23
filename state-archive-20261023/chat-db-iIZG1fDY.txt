@@ -1,0 +1,40 @@
+▌执行 FW-7 工单任务 db-iIZG1fDY
+● 运行中 · deepseek-v4.1-flash-f… · 6m43s · tok 124.2k · 消息 59
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 cd mobile && npx tsc --noEmit                       → exit 0（0 error）
+
+▌助手 npm run lint                                        → exit 0（无告警）
+
+▌助手 node --experimental-strip-types --test ... $(find src -name '*.test.ts')
+
+▌助手                                                     → tests 327 / pass 326 / fail 0 / skipped 1（基线 312 + 本卡新增 15）
+
+▌助手 grep -c "expo-notifications" package.json           → 1
+
+▌助手 ```
+
+▌助手 全量 **327 ≥ 312+新增**，零红（唯一 skip 为本卡前既有用例）。
+
+▌助手 ## ③ PRD §11.1 依赖白名单核对结论
+
+▌助手 - **§11.1 版本矩阵表未列 `expo-notifications`**（表内仅 expo-router/zustand/i18next/supabase/AsyncStorage/secure-store/iap/view-shot）→ 按卡尾要求记 **「待架构追认」**。
+
+▌助手 - 但同节 **prebuild 四条硬约束**明写「expo-notifications 需 APNs/FCM entitlements」、**§11.2 双端一致性矩阵 F6 行**明写「expo-notifications 统一调度」→ 属于已按能力定标、仅未进版本矩阵表，非新增未审批依赖。
+
+▌助手 - 版本依据：`node_modules/expo/bundledNativeModules.json` = `~57.0.22`（即 `npx expo install` 会写入的值），离线核对后手写；实际解析 57.0.24（同 minor）。
+
+▌助手 ## ④ 需经理知晓的三点风险（未擅自处理）
+
+▌助手 1. **m12 键集判分仍 FAIL（本卡前已 FAIL）**：`node scripts/grade/m12.mjs` → en 149 键 / 10 外语桶 127 / zh-Hans 147，`S4 missing`、`S6 键数一致` FAIL。基线即缺 19 键（en 146 vs ext 127，另 zh 缺 2），本卡新增 3 键后扩为 22；补键需改 `locales-ext-a/b.ts`，**不在本卡允许文件内**。
+
+▌助手 2. **`app/generating.tsx` 310 行超 300 软上限**：拆分建议=两个 expo-notifications 端口适配 + priming 卡抽到 `src/features/notifications/`（本卡只允许新建 permission.ts/schedule.ts，故暂留原处）。
+
+▌助手 3. **原生侧未验证**：本工作区无 `ios/`、`android/`，`expo-notifications` 的 autolink/entitlements 需在 prebuild 期落地（app.json 加 plugin、APNs/FCM 配置不在本卡允许范围）；Android 渠道按 Expo 默认，未做远端推送/token 上报（归 M09）；未做真机通知到达验证。
+
+▌助手 未改动：ticket 卡本体（在工作区外且不在允许范围，自验结果按此回传，未贴卡尾）、状态机语义、其它任何文件。未执行任何 git 操作。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:44:28 · ses iIZG1fDY

@@ -1,0 +1,36 @@
+▌  db-BeyfpZiv
+● 运行中 · mimo-v2.6-flash · 10m15s · tok 104.5k · 消息 37
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  → 空 adapter）+ `restoreMessageKey` 文案映射 |
+
+▌助手 | `mobile/src/shared/i18n/report.ts` | +4 | 加键 `settings.restore.none`、`settings.restore.running`（en + 
+  zh-Hans；10 语欠账归 FW15） |
+
+▌助手 | `mobile/src/features/iap/restore.test.ts` | 新建 4 测试 | 无 adapter→none 文案；restoring 
+  态转换；连点只触发一次；空列表/查询抛错分支 |
+
+▌助手 ## ② 自验命令与逐条结果
+
+▌助手 ```
+
+▌助手 cd mobile && npx tsc --noEmit        → 通过（0 错误）
+
+▌助手 cd mobile && npm run lint            → 0 error；1 warning 为 app/report.tsx:17 既有问题（本卡未碰该文件）
+
+▌助手 node --test $(find src -name '*.test.ts')
+
+▌助手   → tests 264 / pass 263 / fail 0 / skipped 1
+
+▌助手 ```
+
+▌助手 - 新增 4 测试（≥3 要求）单跑全绿；全量 fail=0（≥249+3=252 要求，实际 264）
+
+▌助手 - 唯一 skipped 为 `blur-pool.test.ts` 既有的"待文案定稿复跑"项，与本卡无关
+
+▌助手 - 边界遵守：未装 billing 依赖、未出网、未碰 http.ts/entitlements、仅改卡片允许的 4 个文件、无任何 git 操作
+
+▌助手 **已验证** — DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 16:35:19 · ses BeyfpZiv

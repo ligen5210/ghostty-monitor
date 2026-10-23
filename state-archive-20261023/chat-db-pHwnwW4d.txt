@@ -1,0 +1,36 @@
+▌  db-pHwnwW4d
+● 运行中 · glm-5.3-flash · 2m56s · tok 36.3k · 消息 11
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 | `mobile/src/shared/net/http.ts` | 已存在（前次运行产物），本次核验合规，零改动 | 297 |
+
+▌助手 | `mobile/src/shared/net/http.test.ts` | 已存在（前次运行产物），本次核验合规，零改动 | 302 |
+
+▌助手 未触碰其他任何文件；未执行任何 git 操作；未新增依赖。
+
+▌助手 ## ② 自验命令与逐条结果
+
+▌助手 | 命令 | 结果 |
+
+▌助手 |---|---|
+
+▌助手 | `npx tsc --noEmit -p mobile` | ⚠️ 命令原样执行时 npx 从缓存拉到占位包 `tsc@2.0.4`（仓库根无 
+  typescript），报"not the tsc command"；改用 `mobile/node_modules/.bin/tsc --noEmit -p .`（同一 
+  project，本地 typescript）→ **通过** |
+
+▌助手 | `node --experimental-strip-types --test --disable-warning=ExperimentalWarning 
+  mobile/src/shared/net/http.test.ts` | **15 pass / 0 fail / 6 suites**（卡面要求 ≥8 例） |
+
+▌助手 覆盖对照卡面要求：ok 二态（T1/T2）、超时中断 90s/15s 两档（T3/T4）、17 码逐个解析含 
+  VERIFY_RECEIPT_INVALID/VERIFY_NOT_CONFIGURED/VERIFY_UPSTREAM_UNAVAILABLE（T5/T6）、非法码按 http 状态回落 
+  404/429/402/409/5xx（T7）、未配置 env 零请求 INTERNAL/0（T9）、401 
+  单次重放与不再放（T10/T11/T12/T15）、六函数 URL 与 POST method（T13）、禁自动重试（T14）。
+
+▌助手 备注：http.ts 297 行，贴近 300 行软上限但未超；`npx tsc` 
+  占位包问题属环境现象，非代码缺陷，供后续工单参考（在 `mobile/` 目录内执行或直接用其 node_modules 的 tsc）。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 14:05:02 · ses pHwnwW4d

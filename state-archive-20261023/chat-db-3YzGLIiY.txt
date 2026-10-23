@@ -1,0 +1,76 @@
+ 执行 IA-8 工单：tsc 类型检查与 lint 测试  db-3YzGLIiY 
+● 运行中 · deepseek-v4.1-flash · 2m59s · tok 69.0k · 消息 25
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Let me view subscription block.
+
+⚙ read [completed] {"limit":28,"offset":220,"path":"/Volumes/移动硬盘/dev/wt-db/mobile/app/generating.tsx"}
+  ⎿ Read file /Volumes/移动硬盘/dev/wt-db/mobile/app/generating.tsx, lines 220-247 ⏎ 220:     void wasPermissionRefused(AsyncStorage).then(setPromptRef
+
+◈ 思考流（最近）
+ 
+I'll leave as is. Additionally, the subscription check should ideally only latch, and once fastPathDone true it's permanent — yes.
+ 
+Final: run full judge command once more cleanly showing all three green, plus confirm no git ops performed (I haven't run git). Verify only one file mo
+ 
+Also should I check that `node --test` includes the generating test? The output showed 417 tests; fine.
+ 
+Let me get a final concise verification output capturing pass counts for each step.
+
+⚙ shell [completed] cd /Volumes/移动硬盘/dev/wt-db/mobile && npx tsc --noEmit; echo "tsc_exit=$?"; npm run lint >/dev/null 2>&1; echo "lint_exit=$?"; n
+  ⎿ tsc_exit=0 ⏎ lint_exit=0 ⏎ # tests 417 ⏎ # pass 416 ⏎ # fail 0 ⏎ # skipped 1 ⏎      542 app/generating.tsx ⏎ 
+
+◈ 思考流（最近）
+All green. Delivery report per charter: two sections — modified files list (path + lines) and self-verification commands with results. No git operation
+ 
+Output DONE at the end.
+
+▌助手 ## ① 改动文件清单
+
+▌助手 | 文件 | 行数 | 改动 |
+
+▌助手 |---|---|---|
+
+▌助手 | `mobile/app/generating.tsx` | 542（原 503，+39） | IA-8 400ms 快路径 |
+
+▌助手 改动点（全部在本文件内）：
+
+▌助手 - 文件头注释补 IA-8 口径说明。
+
+▌助手 - 新增常量 `FAST_PATH_THRESHOLD_MS = 400` 与纯函数 `isFastPathDone(task, elapsedMs)`（`status==='done' && l0!==null && elapsedMs<400`）。
+
+▌助手 - 组件内新增进页时刻 `enteredAt`（`useState` 懒初始化，仅为内存时间戳）与 `fastPathDone` 锁存态（初值按进页快照判定；命中后保持，防跨 400ms 后等
+
+▌助手 - 既有 `generationStore.subscribe` 回调内递增判定：done 在 <400ms 内到达 → `setFastPathDone(true)`（订阅语义、轮询、90s 看门、幂等重试、通知排程
+
+▌助手 - 渲染层新增早退分支：命中快路径只渲染页面底色（`testID="generating-fast-forward"`），环/标题/轮播/副说明/priming/免责一帧不渲染；前进仍由既有 `d
+
+▌助手 ## ② 自验（`cd mobile && npx tsc --noEmit && npm run lint && node --test`）
+
+▌助手 | 命令 | 结果 |
+
+▌助手 |---|---|
+
+▌助手 | `npx tsc --noEmit` | exit 0（无输出） |
+
+▌助手 | `npm run lint` | exit 0（改动前版本曾报 `react-hooks/purity`：渲染期调用 `Date.now`，已改为 `useState` 懒初始化，现 0 error / 0 warning） |
+
+▌助手 | `node --test` | 417 tests / 416 pass / **0 fail** / 1 skipped（既有 generating 静态守卫 4 组全绿，未改测试断言——无“立即渲染等待页”类断言存在） 
+
+▌助手 基线对照：改动前同三命令同样全绿（416 pass），本卡未引入红项。
+
+▌助手 补充说明：
+
+▌助手 - 判定口径按卡片“进入页时间戳差值”：完成时刻距进页 <400ms 才算命中；进入时即已 done（如复用页面/后台回前台）按 0ms 命中直接前进；≥400ms 的完成完
+  。
+
+▌助手 - 未新增定时器：无 `setTimeout/setInterval` 增量，重渲染由既有 store 订阅触发。
+
+▌助手 - `git` 操作按本次指令**全部未执行**（卡片要求的 `commit 到 ticket/ia-8` 留待有 git 权限的环节），无 push。
+
+▌助手 - 单文件行数提示：`generating.tsx` 改动前已 503 行、超 300 行软上限，本次 +39；建议后续单独卡片把 `FAIL_VARIANT_BY_CODE`/话术映射与两个 resolve 
+
+▌助手 DONE
+
+  … 等待（succeeded）
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 23:05:45 · ses 3YzGLIiY

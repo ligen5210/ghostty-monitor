@@ -1,0 +1,37 @@
+ 执行 IA-9 任务卡片  db-J2UrcVCJ 
+● 运行中 · mimo-v2.6-flash · 24m23s · tok 191.7k · 消息 31
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+1. Remove import of resolveDisclosureSlot (line 24).
+2. Remove LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent from react-native imports.
+3. Remove scrollY/disclosureTop state, slot const, handleScroll, handleDisclosureLayout.
+4. Restructure JSX: content (title/body/tips) in ScrollView; fixed ctaZone with AiDisclosureBar + Pressable CTA; ConsentSheet unchanged.
+5. styles: add ctaZone; remove marginTop from cta.
+ 
+Let me make the edits.
+
+▌助手 Continuing IA-6 implementation in `mobile/app/photo-intro.tsx`.
+
+⚙ edit [error] {"path":"/Volumes/移动硬盘/dev/wt-fix/mobile/app/photo-intro.tsx","oldString":"import {\n  Platform,\n  Pressable,\n  ScrollView,\n  Sty
+
+◈ 思考流（最近）
+The file may have changed? Let me re-read the top of the file.
+
+⚙ read [completed] {"limit":60,"path":"/Volumes/移动硬盘/dev/wt-fix/mobile/app/photo-intro.tsx"}
+  ⎿ Read file /Volumes/移动硬盘/dev/wt-fix/mobile/app/photo-intro.tsx, lines 1-60 ⏎ 1: import AsyncStorage from '@react-native-async-storage/async-stor
+
+◈ 思考流（最近）
+Interesting — the imports are already cleaned: no LayoutChangeEvent/NativeScrollEvent/NativeSyntheticEvent, no resolveDisclosureSlot import. So the fil
+
+⚙ read [completed] {"limit":180,"offset":60,"path":"/Volumes/移动硬盘/dev/wt-fix/mobile/app/photo-intro.tsx"}
+  ⎿ Read file /Volumes/移动硬盘/dev/wt-fix/mobile/app/photo-intro.tsx, lines 60-239 ⏎ 60:  * F3 照片引导页（M1-02a：选图 + 端上质检 + BIPA 单独同意 + 
+  ⎿ 敏（重编码剥 EXIF、≤PHOTO_MAX_BYTES、长边 ≤PHOTO_MAX_EDGE、临时文件读后即删） ⏎ 64:  *      → 压缩成功即 replace 进问卷（不留返回栈）。 ⏎ 65:  * ⏎ 
+  ⎿ ； ⏎ 6
+
+◈ 思考流（最近）
+The file already contains an IA-6 doc block (lines 80-84) and the state/scroll machinery has been removed. So IA-6 appears already implemented too. Let
+
+⚙ read [completed] {"offset":240,"path":"/Volumes/移动硬盘/dev/wt-fix/mobile/app/photo-intro.tsx"}
+  ⎿ Read file /Volumes/移动硬盘/dev/wt-fix/mobile/app/photo-intro.tsx, lines 240-390 ⏎ 240:       return; ⏎ 241:     } ⏎ 242:     setSheet(dismissConse
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 23:42:13 · ses J2UrcVCJ

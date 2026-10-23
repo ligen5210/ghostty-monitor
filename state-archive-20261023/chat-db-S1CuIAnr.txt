@@ -1,0 +1,37 @@
+ 执行 IA-9 卡片任务并运行校验  db-S1CuIAnr 
+● 运行中 · deepseek-v4.1-flash · 7m12s · tok 120.5k · 消息 61
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  const cardWidth = ...
+```
+C: 852-93=759; 759-206=553 → width 311. SE: 647-206=441 → 248.
+ 
+Also remove unused SCREEN_TOP_PAD/BOTTOM_PAD constants, headerHeight state/handler, and title onLayout. Line count back down (~-12).
+ 
+Let me apply.
+
+▌助手 Refining the card-height formula to match the design doc's numbers (可用高 = 窗口 − 安全区；控制区 = 实测控制块):
+
+⚙ edit [completed] {"newString":"/** 初始组合（8 组合中的第一格；分段控件直接改 type/ratio/theme 三键）。 */\nconst INITIAL_COMBO: CardCombo = { type: 
+  ⎿ Edited mobile/app/share-preview.tsx (1 replacement)
+
+⚙ edit [completed] {"newString":"  const [sharing, setSharing] = useState(false);\n  /** 控制区（分段控件 + 分享按钮）实测高 = IA-9 §5.4-3 的「控制区高
+  ⎿ Edited mobile/app/share-preview.tsx (1 replacement)
+
+⚙ edit [completed] {"newString":"  /**\n   * IA-9 §5.4-3：卡高按可用高收敛——卡高 = min(宽 × 画布高倍率, 可用高 − 控制区高)。\n   * 可用高 = 窗口高 − 上
+  出尺寸不变（仍走 features/share/cards.ts 的 CARD_SIZE 1080×1920 / 1080×1350）
+  ⎿ Edited mobile/app/share-preview.tsx (1 replacement)
+
+⚙ edit [completed] {"newString":"        <Text style={[styles.title, typeStyle('title.lg', i18n.language), { color: colors['text.primary'] }]}>\n      
+  ⎿ Edited mobile/app/share-preview.tsx (1 replacement)
+
+⚙ read [completed] {"path":"/Volumes/移动硬盘/dev/wt-fix/mobile/app/share-preview.tsx","offset":126,"limit":80}
+  ⎿ Read file /Volumes/移动硬盘/dev/wt-fix/mobile/app/share-preview.tsx, lines 126-205 ⏎ 126:   const scheme = useColorScheme(); ⏎ 127:   const colors 
+
+◈ 思考流（最近）
+Good. Now re-run all three verifications.
+
+⚙ shell [completed] cd /Volumes/移动硬盘/dev/wt-fix/mobile && npx tsc --noEmit 2>&1; echo "TSC_EXIT=$?"; npm run lint >/dev/null 2>&1; echo "LINT_EXIT=
+  ⎿ app/generating.tsx(435,24): error TS2339: Property 'container' does not exist on type '{ containerSafe: { flex: number; alignItems: "center"; justi
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 23:17:12 · ses S1CuIAnr

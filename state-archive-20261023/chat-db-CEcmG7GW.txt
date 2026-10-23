@@ -1,0 +1,37 @@
+ 执行 QA2.md 卡片任务（禁 git 操作）  db-CEcmG7GW 
+● 运行中 · deepseek-v4.1-flash · 8m29s · tok 125.8k · 消息 71
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 | `mobile/app/quiz.tsx` | 420 → 375 | `handleSubmit` 改同步非阻塞：`canSubmit` 门控 → 载荷 fail-closed → `beginUpload`（sta
+
+▌助手 | `mobile/app/generating.tsx` | 455 → 503 | 重试改**同一 generation_id 幂等重发**（`retryRunBody` + `beginUpload` 回 upload
+  轮询/90s/通知逻辑零改动） |
+
+▌助手 | `mobile/src/components/generating/generating.test.ts` | 192 → 194 | 状态机零改动守卫：`['重试路由', router.push('/quiz')]
+
+▌助手 | `mobile/src/shared/i18n/report.ts` | 未改 | 无需新键：新增 en 键会触发 `index.test.ts`「10 语 strict diff=0」，而 10 语桶
+
+▌助手 **自验（逐条）**
+
+▌助手 ```bash
+
+▌助手 $ cd mobile && npx tsc --noEmit && npm run lint      # EXIT=0，0 error 0 warning
+
+▌助手 $ node --experimental-strip-types --test --disable-warning=ExperimentalWarning $(find src -name '*.test.ts')
+
+▌助手 # tests 374 / pass 373 / fail 0 / skipped 1(既有:AC-M05-02 U2-04b 待文案定稿) / suites 113
+
+▌助手 $ grep -q "await api.generate" mobile/app/quiz.tsx && echo STILL_BLOCKING || echo NONBLOCK_OK
+
+▌助手 NONBLOCK_OK
+
+▌助手 ```
+
+▌助手 新增测试 ≥6 达标（9 条），基线 fail 0。
+
+▌助手 **边界确认**：未改 `src/features/quiz/submit.ts` 与其测试；未改状态枚举 `idle/uploading/queued/generating/done/failed`；通
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 19:49:18 · ses CEcmG7GW

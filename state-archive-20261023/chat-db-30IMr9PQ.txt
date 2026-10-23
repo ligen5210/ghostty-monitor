@@ -1,0 +1,40 @@
+▌执行UX-C卡片任务并跑校验 db-30IMr9PQ
+已完成 · mimo-v2.6-flash · 用时 50m49s · exit 0
+───────────────────────────────────────────────────────────────────────────────────────────────
+▌助手 ```
+
+▌助手 cd mobile && npx tsc --noEmit                    → PASS（0 错）
+
+▌助手 cd mobile && npm run lint                        → 0 error / 1 warning
+
+▌助手     （warning=app/report.tsx 'PAYWALL_VIEWED_KEY' 未使用——他卡产物，非本卡文件，未动）
+
+▌助手 cd mobile && node scripts/grade/m01.mjs          → PASS 13 / FAIL 1
+
+▌助手 cd mobile && node scripts/grade/m02.mjs          → PASS 49 / FAIL 0 / BLOCKED 4
+
+▌助手 cd mobile && node --test $(find src -name '*.test.ts')
+
+▌助手                                                  → 273 tests / 272 pass / 0 fail / 1 skipped
+
+▌助手 ```
+
+▌助手 **m01 唯一 FAIL = S12（法务 URL 单点）为预存在红，非本卡引入**：命中文件是 `src/features/share/cards.ts` 与 `src/features/report/report-share.test.ts`（M1-07b 报告/分享卡的提交产物，不在 UX-C 允许改范围内
+  ，按边界不碰）。已用 `git stash` 后复跑 m01 验证：HEAD 上同样 FAIL S12。同理 lint warning 在 `app/report.tsx`。**如需清这两个红，须另开卡派给报告/分享卡负责人
+  。**
+
+▌助手 合规不变量复核（红线 §9.3 全过）：年龄门零 TextInput/零权限/禁返回/单一退出（m01 S1/S4/S9 绿）；AI 告知在同意控件之前（m01 S11 + m02 S4 绿）；同
+  意底栏五要素可滚+CTA 吸底（m02 S3 绿）；YearPickerSheet 只换皮（birth-year-scroll.test 全绿，含偏移提交/禁页面重算断言）；文案零新增（i18n index.test 绿，零硬编
+  码扫描过）；未改路由/状态机/埋点；未装依赖。
+
+▌助手 ### 备注
+
+▌助手 - `runs/acceptance/ux/` 下另有 17:48 的同名 UX-C-* 截图（前一会话产物），两套并存未删。
+
+▌助手 - M-UX-01 光谱柔光底纹尚未产出，价值页暂以 `opacity.glow` 圆位柔光实现（已在代码注释标明，底纹出图后可无损替换）。
+
+▌助手 **DONE**
+
+  … 等待（succeeded）
+───────────────────────────────────────────────────────────────────────────────────────────────
+run 已结束，pane 即将关闭 · 18:01:51

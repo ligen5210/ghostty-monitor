@@ -1,0 +1,83 @@
+▌执行 FW-13 任务卡片 db-3jgcFrop
+● 运行中 · deepseek-v4.1-flash-f… · 4m00s · tok 89.9k · 消息 32
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ 
+Now check that `strong` prop unused warning? Used. `disabled` default used.
+ 
+Also check `PhotoQualityTip` import cycle: it imports from features/photo/quality (pure) — no cycle.
+ 
+Check tokens key names 'body.md', 'title.lg' exist — tsc passed, so yes.
+ 
+Now: does any other grader (m01/m12) scan for component count or CJK in new component? Run full verification scripts quickly: npm run verify:m01 and verify:m12? There's no m12 script. Run m01 too to ensure no regression (photo-intro is scanned by m01 for consent order etc.).
+
+⚙ shell [completed] cd /Volumes/移动硬盘/dev/wt-db/mobile && npm run judge:M01 2>&1 | tail -8
+  ⎿ PASS [AC-M01-07][S9] 退出页禁返回手势 + 禁系统返回键 + 无返回导航出口 ⏎ PASS [AC-M01-10][S10] 出生年份零持久化 / 零建列 / 零埋点字段 ⏎ PASS [AC-M01-11][S11] AI 告知条出现在同意控件之前 ⏎ FAIL [AC-M01-13][S12] 法务 URL 散落 src/features/report/report-share.test.ts, src/features/share/cards.ts, src/navigation/deep-link.test.ts（改一次漏一处，与呈报版本失一致） ⏎ PASS [AC-M01-14][S13] 数据权利 mailto 入口 + 30 天/72h SLA 说明 ⏎ PASS [规范][S14] 代码规范机检（禁 any / 禁 require / 禁 CJS） ⏎
+
+◈ 思考流（最近）
+Deliverables/notes:
+- quality.tip.strong3 not added; used existing strong_guide (12-language parity).
+- report.ts unchanged (no new key needed).
+- no image assets.
+- Blur/dark real detection landed as pure functions; wiring pixels requires native decoder (M1-02b).
+- checkQuality signature: added optional second param, structure unchanged.
+ 
+Report.
+
+▌助手 ## 交付：FW-13 照片质检原生实现
+
+▌助手 ### ① 改动文件清单
+
+▌助手 | 文件 | 行数 | 内容 |
+
+▌助手 |---|---|---|
+
+▌助手 | `mobile/src/features/photo/quality.ts` | 280 | 真检测落地：拉普拉斯方差清晰度 + 均值亮度两类真判；`FaceDetector` 注入点（默认 null=跳过人脸两类）；`checkQuality(uri, options?)` 返回结构不变；3 次强引导台账（内存态） |
+
+▌助手 | `mobile/src/components/PhotoQualityTip.tsx` | 125（新） | 拦截提示卡：色块+Text 字形图标（零 SVG/零生图）+ 四 reason 分类文案 + 强引导追加行 + 重选 CTA |
+
+▌助手 | `mobile/app/photo-intro.tsx` | 322（原 300，+22） | 接 `reject` 台账状态与按 reason 渲染 `PhotoQualityTip`；通过即归零；原 `tipKey` 保留给重选/压缩失败提示 |
+
+▌助手 | `mobile/src/features/photo/quality.test.ts` | 358 | 新增 12 个用例（清晰/模糊/低对比/暗/组合/hook 缺省跳过/hook 四分支/注入卸下/非法帧/计数 1-2-3 与换因重数/无上限） |
+
+▌助手 | `mobile/src/shared/i18n/report.ts` | 未改 | 本卡无需新键（见下） |
+
+▌助手 | `mobile/assets/fixtures/quality/` | 未建 | 用构造像素数组，不依赖图片文件 |
+
+▌助手 **两处如实偏差（需总经理知晓）**
+
+▌助手 1. 强引导键用**既有** `quality.tip.strong_guide`，未新增 `quality.tip.strong3`：新增键会破坏 `i18n/index.test.ts` 的 12 语言 strict diff（10 个外语桶必须同步补齐，属 FW-15 范围，本卡不允许改 `locales-ext-*`）。该键 en 值已含 `/light/`+`/one person/`+`/facing the camera straight on/` 强引导语义，满足 AC-M02-14/U3 且与 1~2 次提示不同 key。
+
+▌助手 2. 模糊/亮度「真拦截」落在纯函数与 `checkQuality` 组装；**取像素仍需原生解码器**（JPEG 解码不属零依赖白名单）→ `checkQuality` 第二参 `frame` 由调用方给，缺省时像素类检查**跳过**（不假装通过、也不误拦）。人脸两类同理走 `setFaceDetector` 注入点，未注入时上层不渲染人脸提
+  示（判分器已验证拦截分支零假功能）。
+
+▌助手 ### ② 自验命令与结果
+
+▌助手 ```
+
+▌助手 cd mobile && npx tsc --noEmit        → exit 0
+
+▌助手 cd mobile && npm run lint            → exit 0（0 error / 0 warning）
+
+▌助手 node --experimental-strip-types --test --disable-warning=ExperimentalWarning $(find src -name '*.test.ts')
+
+▌助手   → tests 327 / suites 97 / pass 326 / fail 0 / skipped 1（基线 315 → +12）
+
+▌助手 grep -q "ok:true" src/features/photo/quality.ts && … || echo STUB_GONE
+
+▌助手   → STUB_GONE
+
+▌助手 npm run judge:M02                    → 53 条：PASS 49 / FAIL 0 / BLOCKED 4（均为设备阶段，与改动前同）
+
+▌助手 npm run judge:M01                    → 14 条：PASS 13 / FAIL 1（AC-M01-13 法务 URL 散落于 report-share.test.ts / share/cards.ts / deep-link.test.ts，本次未触碰，既存项）
+
+▌助手 ```
+
+▌助手 边界遵守：未装 Vision/ML Kit、未引图片资产、未改同意流程语义、未动 ios/android、未执行任何写类 git 操作（无 commit/push）。
+
+▌助手 备注：`photo-intro.tsx` 322 行超 300 软上限，建议后续把「选图→质检→台账→同意」抽 `features/photo/use-photo-pick.ts` 时一并回落。
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 18:42:51 · ses 3jgcFrop

@@ -1,0 +1,37 @@
+ 执行 QA5.md 任务卡片  db-kA210qI1 
+● 运行中 · deepseek-v4.1-flash · 10m47s · tok 183.7k · 消息 108
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌助手 cd mobile && npx tsc --noEmit && npm run lint          → tsc 0 错；eslint 0 错 0 警告
+
+▌助手 node --experimental-strip-types --test ... src/*.test  → tests 361 / pass 360 / fail 0 / skipped 1（skip 为既有 blur-pool 
+
+▌助手 npx -p typescript@~6.0.3 tsc -p supabase/functions/tsconfig.typecheck.json → 0 错
+
+▌助手 node --test ... "supabase/functions/**/*.test.ts"      → tests 225 / pass 225 / fail 0（基线 217 → +8）
+
+▌助手 ```
+
+▌助手 新增用例（14）：session 回写 installs.dns_opt_out + 车道落 eu、同态不重复写、缺省不动库值、consent_logs 落 photo_withdraw/w
+  端 bootstrap 回放 + 清 pending、上报成功体带键、上报失败写 pending、未配置零请求；`dns_opt_out` 白名单/构造器/剥离/脏值报错。
+
+▌助手 ## 备注（依赖态与缺口）
+
+▌助手 1. **QA1 依赖态**：`http.ts` 目前仍只带 `apikey`，无 `Authorization: Bearer`（QA1 未合）。上报/回放请求在 `verify_jwt=true`
+
+▌助手 2. `photo_withdraw` **不 emit 埋点**：PRD §6 22 事件表无此事件名（只有 `dns_opt_out`），按卡面「若白名单有」判定为无，未造
+
+▌助手 3. `consent_logs.version_hash` 会话回放无版本源 → 落空串（不造哈希），已在类型注释标「诚实标注」。如需真值，需在 session 请
+
+▌助手 4. `consent-log.ts` 已含 `photo_withdraw` 类型与 `withdrawn` 动作，无需改（未改）。
+
+▌助手 5. 单文件软上限 300 超出情况（合规链本身带来的端口数）：`session/handler.ts 378`、`session/index.ts 318`、`generate/index.t
+  隐私行抽 `SettingsPrivacyGroup.tsx`。
+
+▌助手 6. 卡片给的「session handler ≤30 行 / index 只解析段」未守住（+66 / +57），差额来自两个 repo 端口定义 + 同态去重查询 + appe
+
+▌助手 DONE
+
+  … 等待（succeeded）
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+跟随中 · 19:50:55 · ses kA210qI1
