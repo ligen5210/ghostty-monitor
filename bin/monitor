@@ -556,12 +556,193 @@ reconcile() {
   if (( need )); then
     local now; now=$(gm_now)
     if (( now - last_rebuild < 1 )); then return 0; fi
-    last_rebuild=$now
-    close_grid
-    rm -rf "$GM_STATE"/rebuild-* 2>/dev/null || true
-    build_grid "${wall[@]}" || { log "网格构建中断，下轮重试"; return 1; }
+
+    # 增量模式（2026-10-24）：任何活跃集合变化——包括层级 4↔6↔8 过渡——都只增删格子，
+    # 正常使用中不存在全量重建（全量仅用于 monitor 自举/面板窗口丢失恢复）
+    load_grid
+    local grid_live=1
+    local gi
+    for ((gi = 0; gi < ${#GRID_TERMS[@]}; gi++)); do
+      is_live_term "${GRID_TERMS[$gi]}" || grid_live=0
+    done
+    if (( grid_live )) && [[ -f $SIGF ]] && (( ${#GRID_TERMS[@]} > 0 )); then
+      incremental_update "${wall[@]}" "${cur_tier:-0}" || { log "增量更新失败，转全量重建"; close_grid; build_grid "${wall[@]}" || { log "网格构建中断，下轮重试"; return 1; }; }
+    else
+      close_grid
+      rm -rf "$GM_STATE"/rebuild-* 2>/dev/null || true
+      build_grid "${wall[@]}" || { log "网格构建中断，下轮重试"; return 1; }
+    fi
     printf '%s' "$sig" | gm_atomic_write "$SIGF"
   fi
+  return 0
+}
+
+# 增量更新：层级过渡（加列/删列）与同层级的格子增删（失败返回非0，调用方回退全量）
+incremental_update() { # run_file... cur_tier
+  local -a runs
+  runs=("${@:1:$#-1}")
+  local cur_tier=${@:$#}
+  load_grid
+
+  # 1) 关闭：已结束/不在上屏名单的 run 格子，以及多余 slot
+  local want_ids="" i gid gkind
+  for ((i = 0; i < ${#runs[@]}; i++)); do
+    want_ids="$want_ids $(gm_run_get "${runs[$i]}" .id),"
+  done
+  local -a KEEP_CELLS=() KEEP_KINDS=() KEEP_IDS=() KEEP_TERMS=()
+  local slots_alive=0
+  for ((i = 0; i < ${#GRID_TERMS[@]}; i++)); do
+    gid=${GRID_IDS[$i]}; gkind=${GRID_KINDS[$i]}
+    if [[ $gkind == run ]]; then
+      if [[ $want_ids == *" ${gid},"* ]]; then
+        KEEP_CELLS+=("${GRID_CELLS[$i]}"); KEEP_KINDS+=(run); KEEP_IDS+=("$gid"); KEEP_TERMS+=("${GRID_TERMS[$i]}")
+      else
+        is_live_term "${GRID_TERMS[$i]}" && as_close_terminal "${GRID_TERMS[$i]}"
+        rm -f "$GM_STATE/hb/$gid"
+        log "增量：关闭结束任务的格子 $gid"
+      fi
+    else
+      (( slots_alive < 8 )) && { KEEP_CELLS+=("${GRID_CELLS[$i]}"); KEEP_KINDS+=(slot); KEEP_IDS+=("$gid"); KEEP_TERMS+=("${GRID_TERMS[$i]}"); slots_alive=$((slots_alive + 1)); }
+    fi
+  done
+  GRID_CELLS=("${KEEP_CELLS[@]}"); GRID_KINDS=("${KEEP_KINDS[@]}"); GRID_IDS=("${KEEP_IDS[@]}"); GRID_TERMS=("${KEEP_TERMS[@]}")
+  save_grid
+
+  # 2) 新增：不在格子里的 run → 在某个存活 pane 上 split 新格
+  local anchor tid cell n_keep=${#GRID_CELLS[@]}
+  for ((i = 0; i < ${#runs[@]}; i++)); do
+    local rid; rid=$(gm_run_get "${runs[$i]}" .id "")
+    grep -q -- "^${rid}	" <(cut -f3 "$GRID") 2>/dev/null && continue
+    (( n_keep >= 7 )) && break
+    # anchor：最后一个存活的格子
+    anchor=${GRID_TERMS[$((n_keep - 1))]}
+    is_live_term "$anchor" || anchor=$DTERM
+    cell=$n_keep
+    rm -f "$GM_STATE/hb/$rid"
+    tid=$(as_split "$anchor" "down" "$GM_ROOT/bin/pane-watcher -H $GM_HOME $rid" \
+      "GM_HOME=$GM_HOME" "GM_MAX_RUNS=$MAX" "GM_POLL=$POLL" \
+      "GM_GOSTATUS=$GM_GOSTATUS" "GM_LEDGER=$GM_LEDGER" \
+      "GM_OPENCODE_DB=$GM_OPENCODE_DB" "PATH=$PATH")
+    [[ -z $tid ]] && { log "增量：为 $rid 建 pane 失败"; return 1; }
+    LIVE_LIST="${LIVE_LIST}T|${tid}|${DWID}"$'\n'
+    GRID_CELLS+=("$cell"); GRID_KINDS+=("run"); GRID_IDS+=("$rid"); GRID_TERMS+=("$tid")
+    save_grid
+    n_keep=${#GRID_CELLS[@]}
+    log "增量：新任务 $rid 顶替空位（格子 $cell）"
+  done
+
+  # 3) 层级过渡：加列（4→6→8）/删列（8→6→4），逐列 split/close，不重建
+  local want_cells; want_cells=$(cells_for ${#runs[@]})
+  local want_dims cur_cols cur_bottoms want_cols want_bottoms j
+  want_dims=$(layout_dims "$want_cells")
+  want_cols=${want_dims%% *}; want_bottoms=${want_dims#* }
+  cur_dims=$(layout_dims "$cur_tier"); cur_cols=${cur_dims%% *}
+  local n_all=${#GRID_CELLS[@]}
+
+  # 顶层行格子索引：cell 0=用量，cell j=第 j 列顶（j=1..cols-1）；底层：cell cols+j
+  if (( want_cols > cur_cols )); then
+    for ((j = cur_cols; j < want_cols; j++)); do
+      # 新列顶格：从上一列顶格右分
+      anchor=${GRID_TERMS[$((j - 1))]}
+      is_live_term "$anchor" || anchor=$DTERM
+      cell=$j
+      if [[ $cell -le ${#runs[@]} ]]; then
+        tid=$(as_split "$anchor" "right" "$GM_ROOT/bin/pane-watcher -H $GM_HOME $(gm_run_get "${runs[$((cell - 1))]}" .id)" \
+          "GM_HOME=$GM_HOME" "GM_MAX_RUNS=$MAX" "GM_POLL=$POLL" \
+          "GM_GOSTATUS=$GM_GOSTATUS" "GM_LEDGER=$GM_LEDGER" \
+          "GM_OPENCODE_DB=$GM_OPENCODE_DB" "PATH=$PATH")
+        [[ -z $tid ]] && return 1
+        GRID_CELLS+=("$cell"); GRID_KINDS+=("run"); GRID_IDS+=("$(gm_run_get "${runs[$((cell - 1))]}" .id)"); GRID_TERMS+=("$tid")
+        save_grid; n_all=${#GRID_CELLS[@]}
+        log "增量：扩列（新列顶格 $cell）"
+      else
+        tid=$(as_split "$anchor" "right" "$GM_ROOT/bin/slot-pane -H $GM_HOME $cell" \
+          "GM_HOME=$GM_HOME" "GM_MAX_RUNS=$MAX" "GM_POLL=$POLL" \
+          "GM_GOSTATUS=$GM_GOSTATUS" "GM_LEDGER=$GM_LEDGER" \
+          "GM_OPENCODE_DB=$GM_OPENCODE_DB" "PATH=$PATH")
+        [[ -z $tid ]] && return 1
+        GRID_CELLS+=("$cell"); GRID_KINDS+=("slot"); GRID_IDS+=("slot-$cell"); GRID_TERMS+=("$tid")
+        save_grid; n_all=${#GRID_CELLS[@]}
+        log "增量：扩列（新列顶空位 $cell）"
+      fi
+      # 新列底格（若该层有底行）
+      if (( want_bottoms > j )); then
+        cell=$((want_cols + j))
+        tid=$(as_split "${GRID_TERMS[$j]}" "down" "$GM_ROOT/bin/slot-pane -H $GM_HOME $cell" \
+          "GM_HOME=$GM_HOME" "GM_MAX_RUNS=$MAX" "GM_POLL=$POLL" \
+          "GM_GOSTATUS=$GM_GOSTATUS" "GM_LEDGER=$GM_LEDGER" \
+          "GM_OPENCODE_DB=$GM_OPENCODE_DB" "PATH=$PATH")
+        [[ -z $tid ]] && return 1
+        GRID_CELLS+=("$cell"); GRID_KINDS+=("slot"); GRID_IDS+=("slot-$cell"); GRID_TERMS+=("$tid")
+        save_grid; n_all=${#GRID_CELLS[@]}
+        log "增量：扩列（新列底空位 $cell）"
+      fi
+    done
+  elif (( want_cols < cur_cols )); then
+    # 删列：先关多列的底格，再关顶格
+    for ((j = want_cols; j < cur_cols; j++)); do
+      local bc=$((cur_cols + j))
+      for ((i = 0; i < n_all; i++)); do
+        if [[ ${GRID_CELLS[$i]} == "$bc" ]]; then
+          is_live_term "${GRID_TERMS[$i]}" && as_close_terminal "${GRID_TERMS[$i]}"
+          unset "GRID_CELLS[$i]" "GRID_KINDS[$i]" "GRID_IDS[$i]" "GRID_TERMS[$i]"
+          GRID_CELLS=("${GRID_CELLS[@]}"); GRID_KINDS=("${GRID_KINDS[@]}"); GRID_IDS=("${GRID_IDS[@]}"); GRID_TERMS=("${GRID_TERMS[@]}")
+          save_grid; n_all=${#GRID_CELLS[@]}
+          break
+        fi
+      done
+      for ((i = 0; i < n_all; i++)); do
+        if [[ ${GRID_CELLS[$i]} == "$j" ]]; then
+          is_live_term "${GRID_TERMS[$i]}" && as_close_terminal "${GRID_TERMS[$i]}"
+          unset "GRID_CELLS[$i]" "GRID_KINDS[$i]" "GRID_IDS[$i]" "GRID_TERMS[$i]"
+          GRID_CELLS=("${GRID_CELLS[@]}"); GRID_KINDS=("${GRID_KINDS[@]}"); GRID_IDS=("${GRID_IDS[@]}"); GRID_TERMS=("${GRID_TERMS[@]}")
+          save_grid; n_all=${#GRID_CELLS[@]}
+          log "增量：缩列（关第 $((j + 1)) 列）"
+          break
+        fi
+      done
+    done
+    # 缩列后把 slot 的 cell 编号规整（仅显示用途，可跳过）
+  fi
+
+  # 4) 同层级内：缺 run 格/多 slot 的兜底微调（尽量少动）
+  n_all=${#GRID_CELLS[@]}
+  local want_run_cells=$((want_cells - 1)) have_run_cells=0
+  for ((i = 0; i < n_all; i++)); do [[ ${GRID_KINDS[$i]} == run ]] && have_run_cells=$((have_run_cells + 1)); done
+  # 多余 slot：从尾部关
+  while (( have_run_cells < want_run_cells && n_all > 0 )); do
+    local li=-1
+    for ((i = n_all - 1; i >= 0; i--)); do [[ ${GRID_KINDS[$i]} == slot ]] && { li=$i; break; }; done
+    (( li < 0 )) && break
+    is_live_term "${GRID_TERMS[$li]}" && as_close_terminal "${GRID_TERMS[$li]}"
+    unset "GRID_CELLS[$li]" "GRID_KINDS[$li]" "GRID_IDS[$li]" "GRID_TERMS[$li]"
+    GRID_CELLS=("${GRID_CELLS[@]}"); GRID_KINDS=("${GRID_KINDS[@]}"); GRID_IDS=("${GRID_IDS[@]}"); GRID_TERMS=("${GRID_TERMS[@]}")
+    save_grid; n_all=${#GRID_CELLS[@]}
+  done
+  # 缺 run 格：补在最后一个存活格下分
+  while (( have_run_cells < want_run_cells )); do
+    local rid=""; local ri2
+    for ((ri2 = 0; ri2 < ${#runs[@]}; ri2++)); do
+      rid=$(gm_run_get "${runs[$ri2]}" .id "")
+      grep -q -- "^${rid}	" <(cut -f3 "$GRID" 2>/dev/null) 2>/dev/null || break
+      rid=""
+    done
+    [[ -z $rid ]] && break
+    local an2=${GRID_TERMS[$((n_all - 1))]}
+    is_live_term "$an2" || an2=$DTERM
+    rm -f "$GM_STATE/hb/$rid"
+    local tid2
+    tid2=$(as_split "$an2" "down" "$GM_ROOT/bin/pane-watcher -H $GM_HOME $rid" \
+      "GM_HOME=$GM_HOME" "GM_MAX_RUNS=$MAX" "GM_POLL=$POLL" \
+      "GM_GOSTATUS=$GM_GOSTATUS" "GM_LEDGER=$GM_LEDGER" \
+      "GM_OPENCODE_DB=$GM_OPENCODE_DB" "PATH=$PATH")
+    [[ -z $tid2 ]] && return 1
+    GRID_CELLS+=("$n_all"); GRID_KINDS+=("run"); GRID_IDS+=("$rid"); GRID_TERMS+=("$tid2")
+    save_grid; n_all=${#GRID_CELLS[@]}; have_run_cells=$((have_run_cells + 1))
+  done
+
+  as_equalize "$DTERM"
+  log "增量更新：run ${#runs[@]} 个（层级 $cur_tier→$want_cells 格，无全量重建）"
   return 0
 }
 
