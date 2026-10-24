@@ -212,7 +212,8 @@ on run argv
     repeat with w in windows
       set mine to false
       repeat with t in terminals of w
-        if (name of t) contains "Ghostty Monitor" or (name of t) contains "空闲槽位" or (name of t) contains "· 对话" then
+        set wdm to (working directory of t)
+        if wdm contains "/state" or (name of t) contains "Ghostty Monitor" or (name of t) contains "空闲槽位" or (name of t) contains "· 对话" then
           set mine to true
           exit repeat
         end if

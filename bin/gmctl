@@ -82,7 +82,8 @@ on run argv
       set mine to false
       repeat with t in terminals of w
         set n to (name of t)
-        if n contains "Ghostty Monitor" or n contains "空闲槽位" or n contains "· 对话" then
+        set wdm to (working directory of t)
+        if wdm contains "/state" or n contains "Ghostty Monitor" or n contains "空闲槽位" or n contains "· 对话" then
           set mine to true
           exit repeat
         end if
