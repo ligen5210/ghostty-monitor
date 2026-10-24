@@ -275,6 +275,7 @@ create_dashboard() {
   local launcher="$GM_STATE/launch-usage.sh"
   cat > "$launcher" <<EOF
 #!/bin/bash
+cd '$GM_STATE' 2>/dev/null || true
 export GM_HOME='$GM_HOME' GM_MAX_RUNS='$MAX' GM_POLL='$POLL'
 export GM_GOSTATUS='$GM_GOSTATUS' GM_LEDGER='$GM_LEDGER' GM_OPENCODE_DB='$GM_OPENCODE_DB'
 exec '$GM_ROOT/bin/usage-pane'
@@ -339,6 +340,7 @@ split_cell() { # anchor dir kind id cell
   cmd="$GM_STATE/launch-$id.sh"
   cat > "$cmd" <<EOF
 #!/bin/bash
+cd '$GM_STATE' 2>/dev/null || true
 export GM_HOME='$GM_HOME' GM_MAX_RUNS='$MAX' GM_POLL='$POLL'
 export GM_GOSTATUS='$GM_GOSTATUS' GM_LEDGER='$GM_LEDGER' GM_OPENCODE_DB='$GM_OPENCODE_DB'
 $inner
@@ -496,6 +498,9 @@ reconcile() {
     wall+=("$rf")
     bound="$bound$sid "
   done < <(gm_db_sessions "$cutoff_ms")
+
+  # 2b+) DB 伪注册表生命周期管理：done 且超 30 分钟的 db-*.json 自动删除（防 444 文件式膨胀）
+  find "$GM_RUNS" -name 'db-*.json' -mmin +30 -delete 2>/dev/null || true
 
   # 2c) 会话行已从 DB 删除的伪 run → 标 done（opencode 会清理失败/临时会话）
   for rf in "$GM_RUNS"/db-*.json; do

@@ -42,6 +42,13 @@ cmd_start() {
   local p
   p=$(monitor_pid)
   if [[ -n $p ]]; then echo "monitor 已在运行（pid ${p}）"; return 0; fi
+  # 机器级互斥：其它 home 的 monitor 在跑 = 会话已被其 DB 发现覆盖，拒绝双开
+  local gp ghome
+  IFS=$'\t' read -r gp ghome < "$GM_ROOT/state/monitor.global" 2>/dev/null || true
+  if gm_alive "$gp" && gm_is_cmd "$gp" "bin/monitor"; then
+    echo "机器上已有 monitor 在跑（pid ${gp}，home ${ghome:-?}）；本 home 的会话由它经 DB 发现覆盖" >&2
+    return 0
+  fi
   if (( fg )); then
     exec "$GM_ROOT/bin/monitor"
   fi
